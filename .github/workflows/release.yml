@@ -69,7 +69,7 @@ jobs:
           releaseBody: "Auto-generated release for NRB Launcher."
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.target && format("--target {0}", matrix.target) || '' }}
+          args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
 
       - name: Show artifacts on failure
         if: failure()

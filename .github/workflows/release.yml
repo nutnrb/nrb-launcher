@@ -19,14 +19,23 @@ jobs:
         include:
           - platform: ubuntu-22.04
             target: ''
+            bundleArgs: ''
           - platform: windows-latest
             target: ''
+            bundleArgs: '--bundles nsis'
           - platform: macos-latest
             target: aarch64-apple-darwin
+            bundleArgs: '--bundles app,dmg'
           - platform: macos-latest
             target: x86_64-apple-darwin
+            bundleArgs: '--bundles app,dmg'
 
     runs-on: ${{ matrix.platform }}
+    env:
+      # Avoid codesign failures on unsigned macOS dev/release builds
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      # Silence DMG notarization prompts on CI
+      TAURI_BUNDLER_DMG_IGNORE_CI: 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -44,7 +53,17 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -69,7 +88,7 @@ jobs:
           releaseBody: "Auto-generated release for NRB Launcher."
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+          args: ${{ matrix.target && format('--target {0} {1}', matrix.target, matrix.bundleArgs) || format('{0}', matrix.bundleArgs) }}
 
       - name: Show artifacts on failure
         if: failure()

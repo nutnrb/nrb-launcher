@@ -78,64 +78,29 @@ jobs:
       - name: Install JS deps
         run: pnpm install --frozen-lockfile
 
-      - name: Build Tauri app
+      - name: Build Tauri app (direct, with verbose)
         id: build
-        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "NRB Launcher ${{ github.ref_name }}"
-          releaseBody: "Auto-generated release for NRB Launcher."
-          releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.target && format('--target {0} {1} --verbose', matrix.target, matrix.bundleArgs) || format('{0} --verbose', matrix.bundleArgs) }}
-        continue-on-error: true
-
-      - name: Run plain tauri build for diagnostics
-        if: steps.build.outcome == 'failure'
         shell: bash
         run: |
           set +e
-          {
-            echo "### Diagnostic capture (failure on ${{ matrix.platform }} target=${{ matrix.target }})"
-            echo ""
-            echo "#### environment"
-            echo '```'
-            uname -a 2>&1 || ver
-            rustc --version 2>&1
-            cargo --version 2>&1
-            node --version 2>&1
-            pnpm --version 2>&1
-            echo '```'
-            echo "#### platform tools"
-            echo '```'
-            which makensis 2>&1 || true
-            which candle 2>&1 || true
-            which light 2>&1 || true
-            which codesign 2>&1 || true
-            which png2icns 2>&1 || true
-            which iconutil 2>&1 || true
-            echo '```'
-            echo "#### target bundle dirs"
-            echo '```'
-            ls -la src-tauri/target/ 2>&1
-            find src-tauri/target -maxdepth 5 -type d -name 'bundle' 2>&1
-            echo '```'
-            echo "#### icons"
-            echo '```'
-            ls -la src-tauri/icons/ 2>&1
-            file src-tauri/icons/* 2>&1
-            echo '```'
-            echo "#### pnpm tauri build --no-bundle --verbose (last 300 lines)"
-            echo '```'
-            pnpm tauri build --no-bundle --verbose 2>&1 | tail -300
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "::error::See step summary above for diagnostic details."
-        continue-on-error: true
+          ARGS="${{ matrix.target && format('--target {0} {1} --verbose', matrix.target, matrix.bundleArgs) || format('{0} --verbose', matrix.bundleArgs) }}"
+          echo "## Running pnpm tauri build $ARGS on ${{ matrix.platform }}" >> "$GITHUB_STEP_SUMMARY"
+          pnpm tauri build $ARGS 2>&1 | tee /tmp/tauri-build.log
+          EXIT=${PIPESTATUS[0]}
+          if [ "$EXIT" -ne 0 ]; then
+            {
+              echo "## Tauri build failed (exit=$EXIT) on ${{ matrix.platform }} target=${{ matrix.target }}"
+              echo ""
+              echo '```'
+              tail -300 /tmp/tauri-build.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit $EXIT
+          fi
 
       - name: Show artifacts on failure
         if: failure()
         run: |
-          echo "::error::Build failed for ${{ matrix.platform }} (${{ matrix.target }}). See step summary for diagnostics."
+          echo "::error::Build failed for ${{ matrix.platform }} (${{ matrix.target }}). See step summary for full error log."

@@ -36,6 +36,8 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       # Silence DMG notarization prompts on CI
       TAURI_BUNDLER_DMG_IGNORE_CI: 'true'
+      # Verbose Rust/Tauri output to help diagnose bundler issues
+      RUST_BACKTRACE: '1'
     steps:
       - uses: actions/checkout@v4
 
@@ -65,30 +67,6 @@ jobs:
             libxdo-dev \
             libssl-dev
 
-      # Pre-install Windows bundle tooling (Tauri 2 requires NSIS, WiX is optional)
-      - name: Install NSIS (Windows only)
-        if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        run: |
-          choco install -y nsis 2>&1 || scoop install nsis 2>&1 || echo "Bundle tooling install via package manager failed; relying on Tauri's auto-download"
-
-      # Generate macOS .icns icon from .png (required by tauri bundler on macOS)
-      - name: Generate icon.icns for macOS
-        if: matrix.platform == 'macos-latest'
-        run: |
-          cd src-tauri/icons
-          if [ ! -f icon.icns ]; then
-            mkdir -p icon.iconset
-            cp icon.png icon.iconset/icon_512x512.png
-            sips -z 512 512 icon.png --out icon.iconset/icon_512x512.png 2>&1 || true
-            sips -z 256 256 icon.png --out icon.iconset/icon_256x256.png 2>&1 || true
-            sips -z 128 128 icon.png --out icon.iconset/icon_128x128.png 2>&1 || true
-            iconutil -c icns icon.iconset -o icon.icns 2>&1 || true
-            rm -rf icon.iconset
-          fi
-          ls -la icon.icns 2>&1 || echo "icon.icns generation failed"
-          cd ../..
-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -102,7 +80,8 @@ jobs:
       - name: Install JS deps
         run: pnpm install --frozen-lockfile
 
-      - name: Build Tauri app
+      - name: Build Tauri app (verbose)
+        id: build
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -112,9 +91,62 @@ jobs:
           releaseBody: "Auto-generated release for NRB Launcher."
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.target && format('--target {0} {1}', matrix.target, matrix.bundleArgs) || format('{0}', matrix.bundleArgs) }}
+          args: ${{ matrix.target && format('--target {0} {1} --verbose', matrix.target, matrix.bundleArgs) || format('{0} --verbose', matrix.bundleArgs) }}
+        continue-on-error: true
+
+      - name: Diagnostic dump on failure
+        if: steps.build.outcome == 'failure'
+        shell: bash
+        run: |
+          set +e
+          mkdir -p /tmp/diag
+          OUT=/tmp/diag/tauri-debug.log
+          {
+            echo "=== environment ==="
+            uname -a 2>&1 || ver
+            echo "--- rust ---"
+            rustc --version 2>&1
+            cargo --version 2>&1
+            echo "--- node ---"
+            node --version 2>&1
+            pnpm --version 2>&1
+            echo "--- pnpm tauri version ---"
+            pnpm tauri --version 2>&1
+            echo "--- platform tools ---"
+            which makensis 2>&1 || true
+            which candle 2>&1 || true
+            which light 2>&1 || true
+            which codesign 2>&1 || true
+            which png2icns 2>&1 || true
+            which iconutil 2>&1 || true
+            echo "--- target bundle dirs ---"
+            ls -la src-tauri/target/ 2>&1
+            find src-tauri/target -maxdepth 5 -type d -name 'bundle' 2>&1
+            echo "--- icons ---"
+            ls -la src-tauri/icons/ 2>&1
+            file src-tauri/icons/* 2>&1
+            echo "--- attempt plain cargo build for diagnostics ---"
+            cd src-tauri
+            cargo build --release 2>&1 | tail -150
+            cd ..
+            echo "--- attempt tauri build --no-bundle ---"
+            pnpm tauri build --no-bundle --verbose 2>&1 | tail -300
+          } > "$OUT" 2>&1
+          echo "--- diag file written to $OUT ($(wc -c < $OUT) bytes) ---"
+          tail -200 "$OUT"
+        continue-on-error: true
+
+      - name: Upload diagnostic log
+        if: steps.build.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-debug-${{ matrix.platform }}-${{ matrix.target || 'default' }}
+          path: /tmp/diag/tauri-debug.log
+          if-no-files-found: ignore
+          retention-days: 7
+        continue-on-error: true
 
       - name: Show artifacts on failure
         if: failure()
         run: |
-          echo "::error::Build failed for ${{ matrix.platform }} (${{ matrix.target }}). See workflow log for actual error."
+          echo "::error::Build failed for ${{ matrix.platform }} (${{ matrix.target }}). See uploaded tauri-debug-* artifact for details."

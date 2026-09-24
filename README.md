@@ -1,182 +1,234 @@
-# NRB Launcher (Tauri)
+# NRB Launcher
 
-Desktop launcher for NRB Hub (`hub.nutnrb.com`). Built with Tauri 2 (Rust + WebView2) + React/Vite frontend. Lightweight (~10 MB installer), embeds WebView for instant UI updates, downloads programs from `downloads.nutnrb.com` as ZIP, verifies SHA-256, extracts to local install dir, and auto-updates itself via GitHub Releases.
+Modern desktop launcher for NRB — manage and run your NRB programs from a single, lightweight app.
+
+[![Release](https://img.shields.io/github/v/release/nutnrb/nrb-launcher)](https://github.com/nutnrb/nrb-launcher/releases/latest)
+[![Build Status](https://github.com/nutnrb/nrb-launcher/actions/workflows/release.yml/badge.svg)](https://github.com/nutnrb/nrb-launcher/actions)
+[![License](https://img.shields.io/github/license/nutnrb/nrb-launcher)](LICENSE)
+[![Tauri](https://img.shields.io/badge/Tauri-2.x-blueviolet)](https://tauri.app/)
+
+Built with [Tauri 2](https://v2.tauri.app/) (Rust + WebView) and React + Vite — small binaries, instant UI updates, native OS integration.
 
 ---
 
-## Quick Start
+## Screenshots
+
+> _Screenshots will be added here once the UI stabilizes. If you'd like to contribute, drop a PNG in `docs/screenshots/` and open a PR._
+
+---
+
+## Features
+
+- **Cross-platform desktop** — Windows, Linux, and macOS (Intel + Apple Silicon) from a single codebase
+- **Lightweight** — ~10 MB installer; uses the OS's WebView instead of bundling a browser
+- **One-click program install** — downloads NRB programs as ZIPs, verifies SHA-256, extracts, and runs
+- **Safe upgrades with rollback** — every install is backed up so you can revert in one click
+- **Auto-update** — the launcher checks GitHub Releases and updates itself in the background
+- **Secure auth** — JWTs stored in the OS keychain (Windows Credential Manager / Linux Secret Service / macOS Keychain)
+- **Hardware fingerprinting** — stable machine ID derived from MAC + CPU + disk serial, hashed client-side
+- **Tray icon** — keep the launcher in the system tray for quick access
+- **Subscription & wallet** — view credit balance and active subscription directly in the app
+- **Offline-friendly** — once installed, programs run locally; only updates and Hub calls hit the network
+
+---
+
+## Installation
+
+Download the latest release from the [Releases page](https://github.com/nutnrb/nrb-launcher/releases).
+
+| Platform | File | Instructions |
+|---|---|---|
+| Windows | `NRB.Launcher_0.1.0_x64-setup.exe` | Run the installer |
+| Linux (Debian / Ubuntu) | `NRB.Launcher_0.1.0_amd64.deb` | `sudo dpkg -i NRB.Launcher_0.1.0_amd64.deb` |
+| Linux (other distros) | `NRB.Launcher_0.1.0_amd64.AppImage` | `chmod +x NRB.Launcher_0.1.0_amd64.AppImage && ./NRB.Launcher_0.1.0_amd64.AppImage` |
+| macOS (Apple Silicon) | `NRB.Launcher_0.1.0_aarch64.dmg` | Open DMG, drag to Applications |
+| macOS (Intel) | `NRB.Launcher_0.1.0_x64.dmg` | Open DMG, drag to Applications |
+| macOS (alternative, `.app.tar.gz`) | `NRB.Launcher_aarch64.app.tar.gz` / `NRB.Launcher_x64.app.tar.gz` | Extract and drag the `.app` to Applications |
+
+> **Note:** Binaries in v0.1.0 are **not code-signed**. First launch may show a Windows SmartScreen warning (click **More info → Run anyway**) or require **right-click → Open** on macOS. Signing is planned for a future release.
+
+---
+
+## Verify your download (SHA-256)
+
+Every published artifact has its SHA-256 checksum recorded in [`SHA256SUMS.txt`](SHA256SUMS.txt) for v0.1.0. Verify before installing:
 
 ```bash
-# Install deps
+# Linux / macOS
+sha256sum -c SHA256SUMS.txt --ignore-missing
+```
+
+```powershell
+# Windows (PowerShell 5+)
+Get-FileHash .\<artifact-name> -Algorithm SHA256
+```
+
+Compare the output against the line in `SHA256SUMS.txt` for the file you downloaded.
+
+---
+
+## Development
+
+### Prerequisites
+
+- **Node.js** ≥ 20 (we test on 22.x)
+- **pnpm** ≥ 8 — `npm install -g pnpm`
+- **Rust** stable — install via [rustup](https://rustup.rs)
+- Platform-specific dependencies:
+  - **Windows:** WebView2 (preinstalled on Windows 11; Windows 10 needs the [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)) and the **MSVC C++ build tools** (Visual Studio Build Tools or a recent Visual Studio with the C++ workload)
+  - **Linux (Debian / Ubuntu):** `libwebkit2gtk-4.1-dev`, `libssl-dev`, `libappindicator3-dev`, `librsvg2-dev`, `patchelf`, `libxdo-dev`, `build-essential`, `pkg-config`, `curl`
+  - **macOS:** Xcode Command Line Tools — `xcode-select --install`
+
+### Setup
+
+```bash
+git clone https://github.com/nutnrb/nrb-launcher.git
+cd nrb-launcher
 pnpm install
+```
 
-# Dev (hot reload)
+### Run in development mode (hot reload)
+
+```bash
 pnpm tauri dev
+```
 
-# Build production installer (Windows: MSI + NSIS)
+This launches the Vite dev server on `http://localhost:1420` and opens the Tauri window. Frontend edits hot-reload; Rust changes trigger an automatic rebuild.
+
+### Build for your current platform
+
+```bash
 pnpm tauri build
 ```
 
+Artifacts land in `src-tauri/target/release/bundle/` (`.exe`/`.msi` on Windows, `.deb` + `.AppImage` on Linux, `.dmg` + `.app` on macOS).
+
+### Build for all platforms
+
+Push a `v*` tag — GitHub Actions builds Windows, Ubuntu, and both macOS variants automatically and uploads them to a GitHub Release:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+See `.github/workflows/release.yml` for the full matrix.
+
+### Local development tips
+
+- Point the launcher at a local Hub by setting `HUB_API_BASE` in a `.env` file:
+  ```bash
+  echo 'HUB_API_BASE=http://localhost:3000/api/v1' > .env
+  ```
+- Logs are written to `%APPDATA%\com.nutnrb.launcher\logs\` (Windows) / `~/.local/share/com.nutnrb.launcher/logs/` (Linux) / `~/Library/Logs/com.nutnrb.launcher/` (macOS) and to stdout when launched from a terminal.
+
 ---
 
-## Project Layout
+## Project Structure
 
 ```
-launcher/
-├── src/                       # React frontend (Vite)
+.
+├── src/                       # React + TypeScript frontend (Vite)
 │   ├── App.tsx                # Main UI (login, dashboard, programs, wallet)
 │   ├── main.tsx
-│   └── components/            # UI components
-├── src-tauri/                 # Rust backend
+│   ├── api.ts                 # Thin wrapper around the Rust commands
+│   └── styles.css
+├── src-tauri/                 # Rust backend (Tauri)
 │   ├── src/
-│   │   ├── main.rs            # Entry (delegates to lib::run)
-│   │   ├── lib.rs             # Plugin/command registration
-│   │   ├── auth.rs            # Login + JWT storage (keyring)
+│   │   ├── main.rs            # Entry — delegates to lib::run
+│   │   ├── lib.rs             # Plugin + command registration
+│   │   ├── auth.rs            # Login + JWT storage (OS keyring)
 │   │   ├── api.rs             # Hub HTTP client
 │   │   ├── download.rs        # ZIP download + extract + SHA-256 verify
 │   │   ├── hardware.rs        # Machine fingerprint (MAC + CPU + disk)
 │   │   ├── store.rs           # Local state persistence
-│   │   └── update.rs          # Auto-update (tauri_plugin_updater)
+│   │   └── update.rs          # Auto-update integration
 │   ├── Cargo.toml
 │   ├── tauri.conf.json
-│   └── .tauri-keygen          # Private signing key (NEVER COMMIT)
-└── .github/workflows/release.yml
+│   └── .tauri-keygen          # Private signing key — NEVER COMMIT
+├── .github/
+│   └── workflows/
+│       └── release.yml        # Multi-platform build + GitHub Release
+├── CHANGELOG.md
+├── SHA256SUMS.txt             # v0.1.0 artifact checksums
+├── package.json
+├── vite.config.ts
+└── tsconfig.json
 ```
 
 ---
 
 ## Configuration
 
-All API endpoints are hardcoded to:
-- Hub API: `https://hub.nutnrb.com/api/v1`
-- Download CDN: `https://downloads.nutnrb.com`
-- Update endpoint: `https://github.com/nutnrb/nrb-launcher/releases/latest/download/latest.json`
+By default, the launcher talks to:
 
-To customize, edit constants in `src-tauri/src/api.rs` and `src-tauri/tauri.conf.json`.
+- **Hub API:** `https://hub.nutnrb.com/api/v1`
+- **Download CDN:** `https://downloads.nutnrb.com`
+- **Update channel:** `https://github.com/nutnrb/nrb-launcher/releases/latest/download/latest.json`
 
----
-
-## Auto-Update Setup
-
-This repo uses `tauri_plugin_updater` with GitHub Releases as the update channel.
-
-### One-time setup (already done)
-
-1. Generated signing keypair (stored at `src-tauri/.tauri-keygen` and `.tauri-keygen.pub`)
-2. Public key embedded in `tauri.conf.json` → `plugins.updater.pubkey`
-3. Private key kept locally — must be configured as GitHub secret `TAURI_SIGNING_PRIVATE_KEY` (base64-encoded contents) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` so CI can sign updates.
-
-### Add secrets to GitHub
-
-```bash
-# Show private key (base64-encode if needed for secret)
-cat src-tauri/.tauri-keygen
-
-# Go to: Settings → Secrets and variables → Actions
-# Add: TAURI_SIGNING_PRIVATE_KEY = (full contents of .tauri-keygen)
-# Add: TAURI_SIGNING_PRIVATE_KEY_PASSWORD = NRBLauncherAutoUpdate2026
-```
-
-### Release flow
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-GitHub Actions (`release.yml`) automatically:
-1. Builds the frontend (`pnpm build`)
-2. Builds the Tauri binary on `windows-latest` runner → `.msi` + `.nsis` installer
-3. Signs the update with the private key
-4. Uploads artifacts to a **draft** GitHub Release
-5. Publishes `latest.json` (the manifest the launcher polls)
-
-Users receive the update next time they launch the app.
+To customize, edit the constants in `src-tauri/src/api.rs` and the updater block in `src-tauri/tauri.conf.json`.
 
 ---
 
-## Commands Exposed to Frontend
+## Security
 
-| Command | Description |
-|---------|-------------|
-| `login(email, password)` | Authenticate against Hub, store JWT in OS keyring |
-| `logout()` | Clear cached auth |
-| `get_cached_auth()` | Read stored JWT + user info |
-| `download_and_install(slug, version, sha256)` | Download ZIP → SHA-256 verify → backup existing → extract → write version marker |
-| `rollback(slug)` | Restore from backup |
-| `get_machine_id()` | Hardware fingerprint (MAC + CPU ID + disk serial → SHA-256) |
-| `check_for_update()` | Query GitHub Releases for newer version |
-| `download_and_install_update()` | Stream download + auto-install + restart |
-| `get_update_state()` | Cached update metadata |
-| `get_launcher_version()` | Current version string |
+- JWT tokens live in the OS-native secret store (via the [`keyring`](https://crates.io/crates/keyring) crate) — never written to disk in plaintext.
+- Hardware fingerprints are one-way hashed with SHA-256 before leaving the machine.
+- All downloads are over HTTPS and verified against published SHA-256 hashes.
+- The Tauri CSP is currently permissive (`null`) for development — tighten it once production CSP rules are finalized.
+- **Never commit `src-tauri/.tauri-keygen`.** It is already in `.gitignore`.
 
 ---
 
-## API Endpoints Used
+## Contributing
 
-The launcher calls these Hub API endpoints (defined in `src-tauri/src/api.rs`):
+Contributions of all sizes are welcome — bug reports, feature requests, docs, and pull requests.
 
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| POST | `/auth/login` | Email/password login |
-| GET | `/auth/me` | Verify cached JWT |
-| GET | `/wallet` | Current credit balance |
-| GET | `/programs` | List available programs |
-| GET | `/programs/{slug}` | Program details + versions |
-| POST | `/programs/{slug}/use` | Deduct credit for program use |
-| GET | `/announcements` | Show news/updates |
-| GET | `/subscription/my` | Subscription status |
+1. Open an [Issue](https://github.com/nutnrb/nrb-launcher/issues) for anything that might need discussion before code lands.
+2. For ideas or questions, use [GitHub Discussions](https://github.com/nutnrb/nrb-launcher/discussions).
+3. For pull requests:
+   - Fork the repo and create a feature branch (`git checkout -b feat/your-thing`)
+   - Keep changes focused; one logical change per PR
+   - Run `pnpm tauri build` locally to make sure both frontend and Rust compile clean
+   - Open a PR against `main` with a clear description and screenshots if UI changed
 
----
-
-## Storage Layout (on user's machine)
-
-```
-%APPDATA%\com.nutnrb.launcher\
-├── programs/                  # Installed program ZIPs extracted
-│   ├── nrb-postbot\
-│   │   ├── (Python + plugins + portable EXE)
-│   │   └── .version
-│   └── .backup\
-│       └── nrb-postbot\       # Rollback target
-└── cache\
-    └── nrb-postbot-1.2.0.zip  # Downloaded but not yet extracted
-```
+Please be kind and patient — this is an early-stage project.
 
 ---
 
-## Local Dev Tips
+## Release Process (maintainers)
 
-- Set `HUB_API_BASE=http://localhost:3000/api/v1` in `.env` to point at local Hub.
-- Use `pnpm tauri dev --no-watch` if hot reload gets noisy.
-- Logs go to `%APPDATA%\com.nutnrb.launcher\logs\` and stdout (when run from terminal).
-
----
-
-## Security Notes
-
-- **Never commit `.tauri-keygen`** (private signing key). Add to `.gitignore`.
-- JWT tokens stored in OS-native secure storage (Windows Credential Manager via `keyring` crate).
-- Hardware fingerprint is one-way hashed (SHA-256) — never sent in plain form.
-- All download URLs use HTTPS. SHA-256 verification prevents MITM.
-- Tauri CSP disabled (`null`) for dev — re-enable for production once CSP rules are finalized.
-
----
-
-## Troubleshooting
-
-| Issue | Fix |
-|-------|-----|
-| `cargo check` fails on missing `pkg-config` | `apt install pkg-config libssl-dev` |
-| `cargo check` fails on missing `glib-2.0` | `apt install libgtk-3-dev libwebkit2gtk-4.1-dev` |
-| `frontendDist not found` | Run `pnpm build` first |
-| `updater.check()` returns None on dev build | Expected — dev builds use a fake version that won't match releases |
-| `pubkey mismatch` error on update | Public key in `tauri.conf.json` must match the key used to sign |
+1. Bump `version` in `package.json` and `src-tauri/tauri.conf.json` (keep them in sync).
+2. Add a new entry to [`CHANGELOG.md`](CHANGELOG.md).
+3. Regenerate `SHA256SUMS.txt` once the artifacts are built:
+   ```bash
+   sha256sum NRB.Launcher_* > SHA256SUMS.txt
+   ```
+4. Commit and push to `main`.
+5. Tag and push the release:
+   ```bash
+   git tag v0.X.Y
+   git push origin v0.X.Y
+   ```
+6. GitHub Actions (`.github/workflows/release.yml`) builds all platform binaries and publishes a GitHub Release automatically.
 
 ---
 
-## See also
+## Roadmap
 
-- [Hub (Next.js) source](../apps/web/)
-- [Tauri 2 docs](https://v2.tauri.app/)
-- [tauri_plugin_updater](https://v2.tauri.app/plugin/updater/)
+- [ ] Code-signing for Windows + macOS
+- [ ] Production CSP and additional webview hardening
+- [ ] Auto-updater signed releases wired into CI
+- [ ] Expanded Linux distribution support (RPM, Flatpak)
+- [ ] In-app program marketplace
+
+---
+
+## License
+
+[MIT](LICENSE) © NRB Team.
+
+## Acknowledgments
+
+Built with [Tauri](https://tauri.app/) — tiny, blazingly fast binaries.
+Icons by the Tauri project and the NRB design team.

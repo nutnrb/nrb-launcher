@@ -84,7 +84,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "NRB Launcher ${{ github.ref_name }}"
           releaseBody: "Auto-generated release for NRB Launcher."
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.target && format('--target {0} {1}', matrix.target, matrix.bundleArgs) || format('{0}', matrix.bundleArgs) }}
 

@@ -65,6 +65,30 @@ jobs:
             libxdo-dev \
             libssl-dev
 
+      # Pre-install Windows bundle tooling (Tauri 2 requires NSIS, WiX is optional)
+      - name: Install NSIS (Windows only)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          choco install -y nsis 2>&1 || scoop install nsis 2>&1 || echo "Bundle tooling install via package manager failed; relying on Tauri's auto-download"
+
+      # Generate macOS .icns icon from .png (required by tauri bundler on macOS)
+      - name: Generate icon.icns for macOS
+        if: matrix.platform == 'macos-latest'
+        run: |
+          cd src-tauri/icons
+          if [ ! -f icon.icns ]; then
+            mkdir -p icon.iconset
+            cp icon.png icon.iconset/icon_512x512.png
+            sips -z 512 512 icon.png --out icon.iconset/icon_512x512.png 2>&1 || true
+            sips -z 256 256 icon.png --out icon.iconset/icon_256x256.png 2>&1 || true
+            sips -z 128 128 icon.png --out icon.iconset/icon_128x128.png 2>&1 || true
+            iconutil -c icns icon.iconset -o icon.icns 2>&1 || true
+            rm -rf icon.iconset
+          fi
+          ls -la icon.icns 2>&1 || echo "icon.icns generation failed"
+          cd ../..
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -78,29 +102,19 @@ jobs:
       - name: Install JS deps
         run: pnpm install --frozen-lockfile
 
-      - name: Build Tauri app (direct, with verbose)
-        id: build
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set +e
-          ARGS="${{ matrix.target && format('--target {0} {1} --verbose', matrix.target, matrix.bundleArgs) || format('{0} --verbose', matrix.bundleArgs) }}"
-          echo "## Running pnpm tauri build $ARGS on ${{ matrix.platform }}" >> "$GITHUB_STEP_SUMMARY"
-          pnpm tauri build $ARGS 2>&1 | tee /tmp/tauri-build.log
-          EXIT=${PIPESTATUS[0]}
-          if [ "$EXIT" -ne 0 ]; then
-            {
-              echo "## Tauri build failed (exit=$EXIT) on ${{ matrix.platform }} target=${{ matrix.target }}"
-              echo ""
-              echo '```'
-              tail -300 /tmp/tauri-build.log
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit $EXIT
-          fi
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "NRB Launcher ${{ github.ref_name }}"
+          releaseBody: "Auto-generated release for NRB Launcher."
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.target && format('--target {0} {1}', matrix.target, matrix.bundleArgs) || format('{0}', matrix.bundleArgs) }}
 
       - name: Show artifacts on failure
         if: failure()
         run: |
-          echo "::error::Build failed for ${{ matrix.platform }} (${{ matrix.target }}). See step summary for full error log."
+          echo "::error::Build failed for ${{ matrix.platform }} (${{ matrix.target }}). See workflow log for actual error."

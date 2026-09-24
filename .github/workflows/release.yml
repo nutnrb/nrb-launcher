@@ -1,102 +1,79 @@
-name: Release Launcher
+name: Release NRB Launcher
 
 on:
   push:
     tags:
-      - "v*.*.*"
+      - "v*"
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Tag to release (e.g. v0.1.0)"
-        required: true
 
 permissions:
   contents: write
 
 jobs:
   build:
-    name: Build (${{ matrix.platform }})
-    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: windows
-            os: windows-latest
-            target: x86_64-pc-windows-msvc
-            args: --bundles msi nsis
-          # Linux dev build (optional)
-          - platform: linux
-            os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            args: --bundles deb appimage
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ""
+          - platform: windows-latest
+            args: ""
 
+    runs-on: ${{ matrix.platform }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: 20
           cache: "pnpm"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+        run: npm install -g pnpm@9
 
-      - name: Install Linux system deps (Linux only)
-        if: matrix.platform == 'linux'
+      - name: Install Linux deps (Ubuntu only)
+        if: matrix.platform == "ubuntu-22.04"
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev \
-            pkg-config \
-            libssl-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Install Rust toolchain
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ matrix.platform == "macos-latest" && "aarch64-apple-darwin,x86_64-apple-darwin" || "" }}
 
       - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
+        uses: swatinem/rust-cache@v2
         with:
-          workspaces: "src-tauri -> target"
+          workspaces: src-tauri -> target
 
-      - name: Install pnpm deps
+      - name: Install JS deps
         run: pnpm install --frozen-lockfile
 
-      - name: Build frontend
-        run: pnpm --filter launcher-ui build
-
-      - name: Build & Publish Tauri
+      - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "NRB Launcher ${{ github.ref_name }}"
-          releaseBody: "See assets below to download."
+          releaseBody: "Auto-generated release for NRB Launcher."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
 
-  notify-build:
-    name: Notify build status
+  sign-windows:
     needs: build
-    runs-on: ubuntu-latest
-    if: always()
+    if: matrix.platform == "windows-latest"
+    runs-on: windows-latest
+    # Placeholder for code-signing; skipped for unsigned test build
     steps:
-      - name: Summary
-        run: |
-          echo "Build status: ${{ needs.build.result }}"
-          if [ "${{ needs.build.result }}" != "success" ]; then
-            echo "::warning::Build failed — check logs."
-          fi
+      - run: echo "Sign step skipped (no cert yet)"

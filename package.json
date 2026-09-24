@@ -1,8 +1,8 @@
 {
   "name": "nrb-launcher",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
-  "description": "NRB Launcher — desktop app to manage NRB programs",
+  "description": "NRB Launcher \u2014 desktop app to manage NRB programs",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-24
+
+### Fixed
+- macOS builds failed due to `macos-latest` runner image rolling forward between v0.1.0 and v0.1.1; pinned both macOS matrix entries to `macos-14` and added `create-dmg` step.
+- Restored diagnostic-on-failure step so future failures are publicly viewable in the Actions Summary tab.
+
 ## [0.1.1] - 2026-09-24
 
 ### Changed

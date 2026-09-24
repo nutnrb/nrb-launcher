@@ -7,8 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-24
+
 ### Changed
 - CI: also produce Windows `.msi` bundle (in addition to NSIS `.exe`) for enterprise/GPO deployment
+- Docs: comprehensive README + SHA256SUMS for verification
+- CI: code signing infrastructure (GPG for Linux, ready for Windows cert and macOS Developer ID)
+
+### Verification
+All 7 artifacts from v0.1.0 smoke-tested on Linux x86_64:
+- `.deb` installs cleanly via dpkg, binary runs under xvfb
+- `.AppImage` extracts and runs under xvfb
+- `.exe` valid NSIS-3 PE32+ Unicode installer
+- macOS `.app` bundles (x64 + aarch64) have correct structure
+- macOS `.dmg` (x64 + aarch64) are valid Apple HFS disk images
 
 ## [0.1.0] - 2026-09-24
 

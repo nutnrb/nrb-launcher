@@ -46,6 +46,7 @@ docker-compose.override.yml
 .tauri-keygen.pub
 *.key
 *.pem
+*.priv
 
 # Build artifacts (already shipped)
 *.msi

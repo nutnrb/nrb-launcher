@@ -53,7 +53,8 @@
       "active": true,
       "dialog": true,
       "endpoints": [
-        "https://github.com/nutnrb/nrb-launcher/releases/latest/download/latest.json"
+        "https://github.com/nutnrb/nrb-launcher/releases/latest/download/latest.json",
+        "https://github.com/nutnrb/nrb-launcher/releases/download/v{{version}}/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZGMjA0RENFNEI0MjYxODAKUldTQVlVSkx6azBnL3pvZlJUNjI1TnNlZDZMT1hUUkU1cnJpZUdsbnY3NUVUNCt0dkVUM0N1Z1gK",
       "windows": {

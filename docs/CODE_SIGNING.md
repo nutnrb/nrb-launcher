@@ -162,4 +162,113 @@ The signing commands above produce `.sig` files. After Tauri uploads artifacts, 
 - [ ] Bought Windows code signing cert, added to Secrets (when ready)
 - [ ] Enrolled Apple Developer Program, added API keys to Secrets (when ready)
 - [ ] Verified signed artifacts on each platform
-- [ ] Updated README to advertise that binaries are signed
+- [ ] Updated README to advertise that binaries are signed---
+
+## Auto-Updater (Tauri)
+
+NRB Launcher uses the Tauri 2.x auto-updater (`tauri-plugin-updater`), which talks
+to a JSON manifest published at the GitHub Releases URL.
+
+### Signing key (already generated)
+
+A dedicated **ed25519** keypair exists for the updater (separate from GPG code signing):
+
+| File | Purpose |
+|---|---|
+| `src-tauri/.tauri-keygen` | **Private** key — gitignored, never commit. Used by CI to sign `latest.json`. |
+| `src-tauri/.tauri-keygen.pub` | **Public** key — checked into the repo (already wired into `tauri.conf.json`). |
+
+> ⚠ The private key file currently lives on `NRB-Server` only. **Back it up to a
+> safe place (password manager / encrypted backup) and add it to GitHub Secrets**
+> (see below). Without it, future releases cannot be signed and users will not
+> be able to install updates.
+
+### Add to GitHub Secrets
+
+Go to: `https://github.com/nutnrb/nrb-launcher/settings/secrets/actions`
+
+| Secret name | Value |
+|---|---|
+| `TAURI_SIGNING_PRIVATE_KEY` | `cat src-tauri/.tauri-keygen` (entire file contents) |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | The passphrase used when generating the key |
+
+`tauri-action` (already used in `.github/workflows/release.yml`) automatically picks
+up these secrets when present, signs every platform bundle, and publishes a
+signed `latest.json` to the GitHub Release.
+
+### Generate a new key (one-time, only if the existing one is lost)
+
+```bash
+pnpm tauri signer generate \
+  -w ~/.tauri/nrb-launcher.key \
+  -p ~/.tauri/nrb-launcher.pub
+```
+
+Then update `src-tauri/tauri.conf.json`:
+
+```json
+{
+  "plugins": {
+    "updater": {
+      "pubkey": "<base64 string from .pub file>"
+    }
+  }
+}
+```
+
+The current public key is already configured — **only re-generate if you've lost
+the private key**. Re-generating requires updating both the secret AND the
+pubkey in `tauri.conf.json` AND shipping a new release for users to receive it.
+
+### Updater configuration (already in `src-tauri/tauri.conf.json`)
+
+```json
+{
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": true,
+      "endpoints": [
+        "https://github.com/nutnrb/nrb-launcher/releases/latest/download/latest.json",
+        "https://github.com/nutnrb/nrb-launcher/releases/download/v{{version}}/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZGMjA0RENFNEI0MjYxODAKUldTQVlVSkx6azBnL3pvZlJUNjI1TnNlZDZMT1hUUkU1cnJpZUdsbnY3NUVUNCt0dkVUM0N1Z1gK",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}
+```
+
+Public key (decoded): ed25519 key `FF204DCE4B426180` (minisign format).
+
+### Backend commands (already in `src-tauri/src/update.rs`)
+
+- `check_for_update` → calls `app.updater().check()`, emits `update_available`
+  / `update_error` events, returns cached `UpdateState`.
+- `download_and_install_update` → downloads the bundle with progress
+  events, installs it, calls `app.restart()` to apply.
+- `get_update_state` / `get_launcher_version` → read cached state.
+
+### Frontend (already in `src/updater.ts` + `src/App.tsx`)
+
+`src/updater.ts` wraps `invoke()` + event listeners. `App.tsx` exposes a
+"ตรวจสอบอัปเดต" (Check for updates) button in the dashboard header that triggers
+`checkForUpdate()` and auto-downloads + installs if a new version is found.
+
+### How it works on release
+
+1. Push a `v*` tag (or trigger `workflow_dispatch`).
+2. CI builds all platform bundles (Linux .deb/.AppImage, Windows .msi/.nsis, macOS .app/.dmg).
+3. If `TAURI_SIGNING_PRIVATE_KEY` is set, `tauri-action` signs each artifact
+   and generates a signed `latest.json` listing them.
+4. `latest.json` is uploaded to the GitHub Release.
+5. On next launch, the user's app calls `check()` → verifies signature with
+   the embedded public key → shows update prompt → downloads → installs →
+   restarts.
+
+### Gitignore
+
+The existing `.gitignore` already excludes `*.key` and `.tauri-keygen*`, so
+the private key cannot be accidentally committed.

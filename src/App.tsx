@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { loadAuthToken, login as apiLogin, listPrograms, getWallet, type Program, type WalletData, setAuthToken } from "./api";
+import {
+  checkForUpdate,
+  downloadAndInstallUpdate,
+  getUpdateState,
+  onUpdateError,
+  onUpdateProgress,
+  onUpdateInstalled,
+  type UpdateState,
+} from "./updater";
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean>(false);
@@ -78,6 +87,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Updater state (current version, available version, progress, status).
+  const [updateState, setUpdateState] = useState<UpdateState | null>(null);
+  const [updatePercent, setUpdatePercent] = useState<number>(0);
+  const [updateBusy, setUpdateBusy] = useState(false);
+
   useEffect(() => {
     Promise.all([listPrograms().catch((e) => { setError(e.message); return { programs: [] }; }), getWallet().catch(() => null)])
       .then(([p, w]) => {
@@ -85,6 +99,49 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         setWallet(w);
       });
   }, []);
+
+  // Subscribe to updater events (progress / installed / error) for the lifetime
+  // of the dashboard; clean up on unmount.
+  useEffect(() => {
+    let unsubs: Array<() => void> = [];
+    (async () => {
+      const u1 = await onUpdateProgress((p) => setUpdatePercent(p.percent || 0));
+      const u2 = await onUpdateInstalled(() => {
+        // Backend calls app.restart() right after this event; nothing to do here.
+      });
+      const u3 = await onUpdateError((msg) => {
+        setUpdateBusy(false);
+        setError(`อัปเดตผิดพลาด: ${msg}`);
+      });
+      unsubs = [u1, u2, u3];
+      // Seed initial state from cache (no network).
+      try {
+        setUpdateState(await getUpdateState());
+      } catch {
+        // ignore
+      }
+    })();
+    return () => { unsubs.forEach((u) => u()); };
+  }, []);
+
+  // Manual "Check for updates" handler.
+  const handleCheckUpdate = async () => {
+    setUpdateBusy(true);
+    setError(null);
+    try {
+      const s = await checkForUpdate();
+      setUpdateState(s);
+      if (s.available_version) {
+        // Auto-download + install; backend emits progress + restart.
+        await downloadAndInstallUpdate();
+      } else {
+        setUpdateBusy(false);
+      }
+    } catch (e: any) {
+      setUpdateBusy(false);
+      setError(e?.message || String(e));
+    }
+  };
 
   return (
     <div className="app">
@@ -94,6 +151,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           <span>เครดิต:</span>
           <span className="credits">{wallet ? Number(wallet.credits).toLocaleString() : "—"}</span>
         </div>
+        <button className="btn btn-secondary" onClick={handleCheckUpdate} disabled={updateBusy}>
+          {updateBusy
+            ? `อัปเดต… ${Math.round(updatePercent)}%`
+            : updateState?.available_version
+                ? `อัปเดตเป็น v${updateState.available_version}`
+                : "ตรวจสอบอัปเดต"}
+        </button>
         <button className="btn btn-secondary" onClick={onLogout}>ออกจากระบบ</button>
       </header>
 

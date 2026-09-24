@@ -1,0 +1,56 @@
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# Node
+node_modules/
+dist/
+.pnpm-store/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.cursor/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Linux bundle outputs (already shipped)
+src-tauri/target/release/bundle/
+
+# Test/coverage
+coverage/
+*.lcov
+
+# Python (if any)
+__pycache__/
+*.pyc
+
+# Docker
+docker-compose.override.yml
+
+# Secrets - NEVER commit
+.tauri-keygen
+.tauri-keygen.pub
+*.key
+*.pem
+
+# Build artifacts (already shipped)
+*.msi
+*.nsis
+*.exe
+*.deb
+*.AppImage
+*.dmg

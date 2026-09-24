@@ -1,0 +1,45 @@
+[package]
+name = "nrb-launcher"
+version = "0.1.0"
+description = "NRB Launcher — desktop app"
+authors = ["NRB Team"]
+license = "MIT"
+repository = "https://github.com/nutnrb/nrb-launcher"
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "nrb_launcher_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-dialog = "=2.7.3"
+tauri-plugin-fs = "=2.5.2"
+tauri-plugin-http = { version = "=2.6.1", features = ["unsafe-headers"] }
+tauri-plugin-notification = "=2.4.0"
+tauri-plugin-os = "=2.3.2"
+tauri-plugin-store = "=2.4.5"
+tauri-plugin-updater = "=2.12.0"
+
+reqwest = { version = "0.12", features = ["stream", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+zip = "0.6"
+keyring = "3"
+dirs = "5"
+futures-util = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
+
+[target.'cfg(unix)'.dependencies]
+hostname = "0.3"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

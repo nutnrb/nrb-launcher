@@ -32,8 +32,23 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     env:
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       TAURI_BUNDLER_DMG_IGNORE_CI: 'true'
+      # Code signing secrets are optional. When present, tauri-action picks them up automatically.
+      # When absent, tauri-action skips signing and produces unsigned artifacts (build still succeeds).
+      WINDOWS_CERT_FILE: ${{ secrets.WINDOWS_CERT_FILE }}
+      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      API_KEY_ID: ${{ secrets.API_KEY_ID }}
+      API_KEY_FILE: ${{ secrets.API_KEY_FILE }}
+      API_ISSUER_ID: ${{ secrets.API_ISSUER_ID }}
+      # Auto-discovery is on by default, but we only enable it when at least one signing secret exists
+      # to avoid noisy warnings on unsigned builds.
+      CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.APPLE_CERTIFICATE != '' && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -76,6 +91,20 @@ jobs:
       - name: Install JS deps
         run: pnpm install --frozen-lockfile
 
+      - name: Import GPG signing key (Linux only, optional)
+        if: matrix.platform == 'ubuntu-22.04' && env.GPG_PRIVATE_KEY != ''
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          echo "$GPG_PRIVATE_KEY" | gpg --import --batch
+          printf 'allow-preset-passphrase\ndefault-cache-ttl 600\nmax-cache-ttl 7200\n' | gpgconf --change-options gpg-agent
+          gpgconf --reload gpg-agent
+          # Prime the agent with the passphrase so subsequent detached-sign calls do not prompt
+          echo "$GPG_PASSPHRASE" | gpg --pinentry-mode loopback --passphrase-fd 0 --sign --detach-sign --output /tmp/.gpg-prime /dev/null
+          rm -f /tmp/.gpg-prime
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -87,3 +116,36 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.target && format('--target {0} {1}', matrix.target, matrix.bundleArgs) || format('{0}', matrix.bundleArgs) }}
+
+      - name: Sign Linux bundles with GPG (Linux only, optional)
+        if: matrix.platform == 'ubuntu-22.04' && env.GPG_PRIVATE_KEY != ''
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          cd src-tauri/target/release/bundle
+          for dir in deb appimage; do
+            if [ -d "$dir" ]; then
+              cd "$dir"
+              shopt -s nullglob
+              for f in *.deb *.AppImage; do
+                echo "Signing $f"
+                echo "$GPG_PASSPHRASE" | gpg --pinentry-mode loopback --passphrase-fd 0 \
+                  --armor --detach-sign --sign "$f"
+              done
+              cd ..
+            fi
+          done
+          echo "=== Signed artifacts ==="
+          find deb appimage -maxdepth 1 \( -name '*.sig' -o -name '*.asc' \) 2>/dev/null || true
+
+      - name: Upload GPG signatures (Linux only)
+        if: matrix.platform == 'ubuntu-22.04' && env.GPG_PRIVATE_KEY != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/release/bundle/deb/*.sig
+            src-tauri/target/release/bundle/deb/*.asc
+            src-tauri/target/release/bundle/appimage/*.sig
+            src-tauri/target/release/bundle/appimage/*.asc
+          fail_on_unmatched_files: false

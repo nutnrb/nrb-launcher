@@ -87,3 +87,53 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.target && format('--target {0} {1}', matrix.target, matrix.bundleArgs) || format('{0}', matrix.bundleArgs) }}
+
+      - name: Inspect bundle output
+        shell: bash
+        run: |
+          set +e
+          OUT=".ci-debug/${GITHUB_RUN_ID}-${{ matrix.platform }}-${{ matrix.target || 'default' }}-bundles.md"
+          mkdir -p .ci-debug
+          {
+            echo "## Bundle inspection"
+            echo ""
+            echo "Platform: \`${{ matrix.platform }}\`  Target: \`${{ matrix.target || 'host' }}\`  Run: \`${GITHUB_RUN_ID}\`  SHA: \`${GITHUB_SHA}\`"
+            echo ""
+            echo "### src-tauri/target"
+            echo '```'
+            ls -la src-tauri/target/ 2>&1 || echo "no target dir"
+            echo '```'
+            echo ""
+            echo "### bundle dir tree"
+            echo '```'
+            find src-tauri/target -maxdepth 6 -type d \( -name 'bundle' -o -name 'release' -o -name 'debug' \) 2>&1 | head -50
+            echo '```'
+            echo ""
+            echo "### bundle files"
+            echo '```'
+            find src-tauri/target -maxdepth 8 -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.nsis' -o -name '*.deb' -o -name '*.AppImage' -o -name '*.app' -o -name '*.dmg' -o -name '*.pkg' \) 2>&1 | head -50
+            echo '```'
+            echo ""
+            echo "### pnpm tauri info"
+            echo '```'
+            pnpm tauri info 2>&1 | head -120
+            echo '```'
+          } > "$OUT"
+          echo "Wrote $OUT ($(wc -c < $OUT) bytes)"
+
+      - name: Push diagnostic to debug branch
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          BRANCH="ci-debug/run-${GITHUB_RUN_ID}/${{ matrix.platform }}-${{ matrix.target || 'default' }}"
+          cd "$GITHUB_WORKSPACE"
+          git config user.email "nrb-bot@nutnrb.local"
+          git config user.name "NRB CI Bot"
+          git stash --include-untracked 2>&1 | head -5
+          git checkout -b "$BRANCH" 2>&1 || git checkout "$BRANCH" 2>&1
+          git add .ci-debug/ 2>&1
+          git commit -m "ci-debug: bundle inspection for run ${GITHUB_RUN_ID} ${{ matrix.platform }} ${{ matrix.target }}" 2>&1
+          git push -u origin "$BRANCH" 2>&1
+          echo "Pushed $BRANCH"
+        continue-on-error: true

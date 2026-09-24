@@ -18,9 +18,9 @@ jobs:
       matrix:
         include:
           - platform: ubuntu-22.04
-            target: ""
+            target: ''
           - platform: windows-latest
-            target: ""
+            target: ''
           - platform: macos-latest
             target: aarch64-apple-darwin
           - platform: macos-latest
@@ -50,7 +50,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target != "" && matrix.target || "" }}
+          targets: ${{ matrix.target != '' && matrix.target || '' }}
 
       - name: Cache Rust
         uses: swatinem/rust-cache@v2
@@ -70,7 +70,7 @@ jobs:
           releaseBody: "Auto-generated release for NRB Launcher."
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.target != "" && format("--target {0}", matrix.target) || "" }}
+          args: ${{ matrix.target != '' && format("--target {0}", matrix.target) || '' }}
 
       - name: Show artifacts on failure
         if: failure()

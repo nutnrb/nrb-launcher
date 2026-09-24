@@ -38,7 +38,8 @@ Download the latest release from the [Releases page](https://github.com/nutnrb/n
 
 | Platform | File | Instructions |
 |---|---|---|
-| Windows | `NRB.Launcher_0.1.0_x64-setup.exe` | Run the installer |
+| Windows (recommended) | `NRB.Launcher_0.1.0_x64-setup.exe` | Run the NSIS installer |
+| Windows (Enterprise / GPO) | `NRB.Launcher_0.1.0_x64_en-US.msi` | Run the MSI installer |
 | Linux (Debian / Ubuntu) | `NRB.Launcher_0.1.0_amd64.deb` | `sudo dpkg -i NRB.Launcher_0.1.0_amd64.deb` |
 | Linux (other distros) | `NRB.Launcher_0.1.0_amd64.AppImage` | `chmod +x NRB.Launcher_0.1.0_amd64.AppImage && ./NRB.Launcher_0.1.0_amd64.AppImage` |
 | macOS (Apple Silicon) | `NRB.Launcher_0.1.0_aarch64.dmg` | Open DMG, drag to Applications |

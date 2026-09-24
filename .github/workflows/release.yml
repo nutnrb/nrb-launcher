@@ -79,6 +79,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Tauri app
+        id: build
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -88,10 +89,56 @@ jobs:
           releaseBody: "Auto-generated release for NRB Launcher."
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.target && format('--target {0} {1}', matrix.target, matrix.bundleArgs) || format('{0}', matrix.bundleArgs) }}
+          args: ${{ matrix.target && format('--target {0} {1} --verbose', matrix.target, matrix.bundleArgs) || format('{0} --verbose', matrix.bundleArgs) }}
+        continue-on-error: true
+
+      - name: Capture build error
+        if: steps.build.outcome == 'failure'
+        shell: bash
+        run: |
+          set +e
+          mkdir -p /tmp/diag
+          OUT=/tmp/diag/tauri-debug.log
+          {
+            echo "=== environment ==="
+            uname -a 2>&1 || ver
+            echo "--- rust ---"
+            rustc --version 2>&1
+            cargo --version 2>&1
+            echo "--- node ---"
+            node --version 2>&1
+            pnpm --version 2>&1
+            echo "--- platform tools ---"
+            which makensis 2>&1 || true
+            which candle 2>&1 || true
+            which light 2>&1 || true
+            which codesign 2>&1 || true
+            which png2icns 2>&1 || true
+            which iconutil 2>&1 || true
+            echo "--- target bundle dirs ---"
+            ls -la src-tauri/target/ 2>&1
+            find src-tauri/target -maxdepth 5 -type d -name 'bundle' 2>&1
+            echo "--- icons ---"
+            ls -la src-tauri/icons/ 2>&1
+            file src-tauri/icons/* 2>&1
+            echo "--- tauri build --no-bundle --verbose ---"
+            pnpm tauri build --no-bundle --verbose 2>&1 | tail -300
+          } > "$OUT" 2>&1
+          echo "--- diag file written to $OUT ($(wc -c < $OUT) bytes) ---"
+          tail -250 "$OUT"
+        continue-on-error: true
+
+      - name: Upload diagnostic log
+        if: steps.build.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-debug-${{ matrix.platform }}-${{ matrix.target || 'default' }}
+          path: /tmp/diag/tauri-debug.log
+          if-no-files-found: ignore
+          retention-days: 7
+        continue-on-error: true
 
       - name: Show artifacts on failure
         if: failure()
         run: |
-          echo "::error::Build failed for ${{ matrix.platform }} (${{ matrix.target }})."
-          echo "Check the log above for the actual error."
+          echo "::error::Build failed for ${{ matrix.platform }} (${{ matrix.target }}). See uploaded tauri-debug-* artifact."

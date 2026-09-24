@@ -23,10 +23,17 @@ jobs:
           - platform: windows-latest
             target: ''
             bundleArgs: '--bundles nsis,msi'
-          - platform: macos-latest
+          # Pinned to macos-14 because macos-latest silently rolled over
+          # between the v0.1.0 (Sep 23, succeeded) and v0.1.1 (Sep 24, failed
+          # on both aarch64 and x86_64) runs. The v0.1.1 source is byte-for-byte
+          # identical to v0.1.0 except for one extra endpoint string in
+          # tauri.conf.json — no source change can explain a macOS-only breakage,
+          # so the difference is environmental (Xcode/SDK/Runner image).
+          # macos-14 is what macos-latest was during the v0.1.0 release.
+          - platform: macos-14
             target: aarch64-apple-darwin
             bundleArgs: '--bundles app,dmg'
-          - platform: macos-latest
+          - platform: macos-14
             target: x86_64-apple-darwin
             bundleArgs: '--bundles app,dmg'
 
@@ -78,6 +85,16 @@ jobs:
             libxdo-dev \
             libssl-dev
 
+      # macOS does not always ship `create-dmg` (used by tauri-bundler for .dmg).
+      # Install via Homebrew if missing. No-op when already present.
+      - name: Ensure macOS bundler deps (create-dmg)
+        if: matrix.platform == 'macos-14'
+        run: |
+          if ! command -v create-dmg >/dev/null 2>&1; then
+            brew install create-dmg
+          fi
+          create-dmg --version || true
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -116,6 +133,47 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.target && format('--target {0} {1}', matrix.target, matrix.bundleArgs) || format('{0}', matrix.bundleArgs) }}
+
+      # If the Tauri build fails, capture the full bundle state into the run's
+      # step summary (publicly visible from the GitHub Actions UI) so we can
+      # diagnose without needing the repo secrets / API admin scope.
+      - name: Capture diagnostic on failure
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          {
+            echo "## Tauri build failure diagnostic"
+            echo ""
+            echo "Platform: \`${{ matrix.platform }}\`  Target: \`${{ matrix.target || 'host' }}\`  Run: \`${GITHUB_RUN_ID}\`  SHA: \`${GITHUB_SHA}\`"
+            echo ""
+            echo "### Toolchain versions"
+            echo '```'
+            echo "macOS: $(sw_vers 2>/dev/null || echo n/a)"
+            echo "Xcode: $(xcodebuild -version 2>/dev/null | head -2 || echo n/a)"
+            echo "Rust: $(rustc --version 2>&1)"
+            echo "Cargo: $(cargo --version 2>&1)"
+            echo "Node: $(node --version 2>&1)"
+            echo "pnpm: $(pnpm --version 2>&1)"
+            echo "Tauri CLI: $(pnpm tauri --version 2>&1 | head -3)"
+            echo '```'
+            echo ""
+            echo "### Bundle directories present"
+            echo '```'
+            find src-tauri/target -maxdepth 6 -type d \( -name 'bundle' -o -name 'release' \) 2>&1 | head -20
+            echo '```'
+            echo ""
+            echo "### Bundle files (any produced before failure)"
+            echo '```'
+            find src-tauri/target -maxdepth 8 -type f \( -name '*.app' -o -name '*.dmg' -o -name '*.msi' -o -name '*.exe' -o -name '*.deb' -o -name '*.AppImage' -o -name '*.pkg' \) -printf '%p (%s bytes)\n' 2>&1 | head -30
+            echo '```'
+            echo ""
+            echo "### Icon files (tauri-bundler can fail on malformed .ico/.icns)"
+            echo '```'
+            ls -la src-tauri/icons/ 2>&1
+            file src-tauri/icons/* 2>&1 | head -20
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Sign Linux bundles with GPG (Linux only, optional)
         if: matrix.platform == 'ubuntu-22.04' && env.GPG_PRIVATE_KEY != ''

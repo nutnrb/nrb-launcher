@@ -76,8 +76,7 @@ jobs:
       - name: Install JS deps
         run: pnpm install --frozen-lockfile
 
-      - name: Build Tauri app (verbose)
-        id: build
+      - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -87,75 +86,4 @@ jobs:
           releaseBody: "Auto-generated release for NRB Launcher."
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.target && format('--target {0} {1} --verbose', matrix.target, matrix.bundleArgs) || format('{0} --verbose', matrix.bundleArgs) }}
-        continue-on-error: true
-
-      - name: Push diagnostic log to public branch
-        if: steps.build.outcome == 'failure'
-        shell: bash
-        run: |
-          set +e
-          BRANCH="ci-debug/run-${GITHUB_RUN_ID}/${{ matrix.platform }}-${{ matrix.target || 'default' }}"
-          OUT="/tmp/diag-${{ matrix.platform }}-${{ matrix.target || 'default' }}.md"
-          {
-            echo "## Tauri build diagnostic"
-            echo ""
-            echo "Run: \`${{ github.run_id }}\`  SHA: \`${GITHUB_SHA}\`  Platform: \`${{ matrix.platform }}\`  Target: \`${{ matrix.target || 'host' }}\`"
-            echo ""
-            echo "### environment"
-            echo '```'
-            uname -a 2>&1 || ver
-            rustc --version 2>&1
-            cargo --version 2>&1
-            node --version 2>&1
-            pnpm --version 2>&1
-            pnpm tauri --version 2>&1
-            echo '```'
-            echo "### platform tools"
-            echo '```'
-            which makensis 2>&1 || echo "makensis: NOT FOUND"
-            which candle 2>&1 || echo "candle: NOT FOUND"
-            which light 2>&1 || echo "light: NOT FOUND"
-            which codesign 2>&1 || echo "codesign: NOT FOUND"
-            which png2icns 2>&1 || echo "png2icns: NOT FOUND"
-            which iconutil 2>&1 || echo "iconutil: NOT FOUND"
-            echo '```'
-            echo "### target dirs"
-            echo '```'
-            ls -la src-tauri/target/ 2>&1
-            find src-tauri/target -maxdepth 5 -type d -name 'bundle' 2>&1
-            echo '```'
-            echo "### icons"
-            echo '```'
-            ls -la src-tauri/icons/ 2>&1
-            file src-tauri/icons/* 2>&1
-            echo '```'
-            echo "### tauri build --no-bundle --verbose (last 400 lines)"
-            echo '```'
-            pnpm tauri build --no-bundle --verbose 2>&1 | tail -400
-            echo '```'
-            echo "### full tauri build with bundling (last 200 lines)"
-            echo '```'
-            ARGS2="${{ matrix.target && format('--target {0} {1} --verbose', matrix.target, matrix.bundleArgs) || format('{0} --verbose', matrix.bundleArgs) }}"
-            pnpm tauri build $ARGS2 2>&1 | tail -200
-            echo '```'
-          } > "$OUT"
-          # Push to a public branch so we can read it
-          cd "$GITHUB_WORKSPACE"
-          git config user.email "nrb-bot@nutnrb.local"
-          git config user.name "NRB CI Bot"
-          # Stash any local changes
-          git stash --include-untracked 2>&1 | head -5
-          git checkout -b "$BRANCH" 2>&1 || git checkout "$BRANCH" 2>&1
-          mkdir -p .ci-debug
-          cp "$OUT" ".ci-debug/${GITHUB_RUN_ID}-${{ matrix.platform }}-${{ matrix.target || 'default' }}.md"
-          git add .ci-debug/ 2>&1
-          git commit -m "ci-debug: tauri build failure on ${{ matrix.platform }} (${{ matrix.target }}) run ${GITHUB_RUN_ID}" 2>&1
-          git push -u origin "$BRANCH" 2>&1
-          echo "Pushed diagnostic log to branch $BRANCH"
-        continue-on-error: true
-
-      - name: Show artifacts on failure
-        if: failure()
-        run: |
-          echo "::error::Build failed for ${{ matrix.platform }} (${{ matrix.target }}). Diagnostic log pushed to branch \`ci-debug/run-${GITHUB_RUN_ID}/${{ matrix.platform }}-${{ matrix.target || 'default' }}\`."
+          args: ${{ matrix.target && format('--target {0} {1}', matrix.target, matrix.bundleArgs) || format('{0}', matrix.bundleArgs) }}

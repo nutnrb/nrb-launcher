@@ -5,6 +5,19 @@ All notable changes to NRB Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.1] - 2026-09-25
+
+### Changed
+- **UI/layout restructure: single scrollable page with login at the bottom.** Removed the 2-column grid (left program list + sticky right LoginPanel). The home page now flows top-to-bottom: TopBar -> Banner -> ProgramList (Legacy + Member, full width) -> LoginPanel (full width, at the bottom) -> footer. The whole page is a single scroll container.
+- `.app` switched from `height: 100vh; overflow: hidden` to `min-height: 100vh; overflow: visible` so the page scrolls naturally.
+- Added a small footer line (NRB Launcher v0.3.1 · {year}).
+- Dev-override "Simulate login" pill remains pinned to the bottom-right corner.
+
+### Notes
+- All existing functionality preserved: QueryClientProvider, sonner toasts, hub iframe postMessage bridge, light/dark theme, and dev override.
+- LoginPanel and ProgramList APIs unchanged.
+- Bumped package.json, src-tauri/tauri.conf.json, and src-tauri/Cargo.toml to 0.3.1.
+
 ## [0.3.0] - 2026-09-25
 
 ### Added

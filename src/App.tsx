@@ -1,4 +1,6 @@
-// NRB Launcher — single-screen home.
+// NRB Launcher — single scrollable page: TopBar → Banner → ProgramList → LoginPanel.
+// v0.3.1 — restructured from a 2-column grid (left list + sticky right login)
+// into a single vertical stack so the login lives at the bottom of the page.
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster, toast } from "sonner";
@@ -9,8 +11,9 @@ import { ProgramList } from "./components/ProgramList";
 import { LoginPanel } from "./components/LoginPanel";
 
 import { clearAuth, loadAuth, onHubMessage, saveAuth, type AuthUser } from "./lib/auth";
+import { useTheme } from "./hooks/useTheme";
 
-const LAUNCHER_VERSION = "0.3.0";
+const LAUNCHER_VERSION = "0.3.1";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,6 +40,9 @@ export default function App() {
 }
 
 function Shell() {
+  // Apply persisted light/dark theme (sets data-theme on <html>).
+  useTheme();
+
   const [user, setUser] = useState<AuthUser | null>(null);
   const [online] = useState<boolean>(true);
 
@@ -45,6 +51,20 @@ function Shell() {
     const cached = loadAuth();
     if (cached) setUser(cached);
   }, []);
+
+  // Re-check auth periodically: another tab/window may have logged out via the
+  // hub iframe. Catches the rare case where we missed the postMessage.
+  useEffect(() => {
+    if (!user) return;
+    const id = setInterval(() => {
+      const stillLogged = loadAuth();
+      if (!stillLogged) {
+        setUser(null);
+        toast("ออกจากระบบแล้ว");
+      }
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [user]);
 
   // Bridge: listen for `hub-login` / `hub-logout` postMessage events from the
   // embedded login iframe. See hub repo `apps/web/src/app/(auth)/login/page.tsx`.
@@ -92,17 +112,24 @@ function Shell() {
   };
 
   return (
-    <div className="app">
+    <div className="app app--stack">
       <TopBar version={LAUNCHER_VERSION} online={online} />
       <Banner />
-      <main className="main">
-        <section className="left">
-          <ProgramList loggedIn={user !== null} />
-        </section>
-        <section className="right">
-          <LoginPanel user={user} onLogout={handleLogout} />
-        </section>
-      </main>
+
+      {/* Section 1: Program list — full width, scrolls with the page. */}
+      <section className="stack-section stack-section--list">
+        <ProgramList loggedIn={user !== null} />
+      </section>
+
+      {/* Section 2: Login — always at the bottom of the page. */}
+      <section className="stack-section stack-section--login">
+        <LoginPanel user={user} onLogout={handleLogout} />
+      </section>
+
+      <footer className="app-footer">
+        NRB Launcher v{LAUNCHER_VERSION} · {new Date().getFullYear()}
+      </footer>
+
       <button
         type="button"
         className="dev-override"

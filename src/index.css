@@ -76,15 +76,49 @@ body {
   flex-direction: column;
 }
 
+/* ══════════════════════════════════════
+   Layout — single scrollable page (v0.3.1)
+══════════════════════════════════════ */
 .app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
   background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
   position: relative;
-  overflow: hidden;
 }
 
+/* v0.3.1: override the old 2-column 100vh-locked layout with a vertical stack
+   that scrolls as one page. Banner + ProgramList + LoginPanel all stacked,
+   login always at the bottom. */
+.app--stack {
+  height: auto;
+  overflow: visible;
+}
+
+.app--stack .stack-section {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  box-sizing: border-box;
+}
+
+.app--stack .stack-section--list {
+  /* Full-width program list — no inner scroll, page itself scrolls. */
+  flex: 0 0 auto;
+}
+
+.app--stack .stack-section--login {
+  flex: 0 0 auto;
+  /* Constrain the login panel a bit so it doesn't stretch absurdly wide. */
+  max-width: 720px;
+  margin-top: 8px;
+  margin-bottom: 24px;
+}
+
+/* Ambient blue glow blobs (match Hub login) */
 .app::before,
 .app::after {
   content: "";
@@ -115,6 +149,9 @@ body {
   opacity: 0.25;
 }
 
+/* ══════════════════════════════════════
+   TopBar
+══════════════════════════════════════ */
 .topbar {
   position: relative;
   z-index: 10;
@@ -202,6 +239,9 @@ body {
   border-color: var(--border-accent);
 }
 
+/* ══════════════════════════════════════
+   Banner
+══════════════════════════════════════ */
 .banner {
   position: relative;
   z-index: 9;
@@ -259,40 +299,37 @@ body {
   background: var(--bg-secondary);
 }
 
+/* ══════════════════════════════════════
+   Main content (legacy 2-col rules — kept inert for back-compat; v0.3.1
+   stacks everything vertically via .app--stack above)
+══════════════════════════════════════ */
 .main {
   position: relative;
   z-index: 1;
   flex: 1;
-  display: flex;
-  gap: 20px;
-  padding: 20px 24px;
-  overflow: hidden;
+  display: none; /* hidden in the single-page layout */
 }
 
-.left {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-.left::-webkit-scrollbar {
-  width: 8px;
-}
-
-.left::-webkit-scrollbar-thumb {
-  background: var(--border-glass);
-  border-radius: 4px;
-}
-
+.left,
 .right {
-  width: 320px;
-  flex-shrink: 0;
+  display: none;
 }
 
+/* v0.3.1 footer */
+.app-footer {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  font-size: 11px;
+  padding: 16px 24px 24px;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  letter-spacing: 0.02em;
+}
+
+/* ══════════════════════════════════════
+   Search
+══════════════════════════════════════ */
 .search {
   position: relative;
 }
@@ -330,6 +367,9 @@ body {
   pointer-events: none;
 }
 
+/* ══════════════════════════════════════
+   Sections
+══════════════════════════════════════ */
 .section-title {
   font-size: 12px;
   font-weight: 600;
@@ -355,6 +395,9 @@ body {
   gap: 14px;
 }
 
+/* ══════════════════════════════════════
+   ProgramCard
+══════════════════════════════════════ */
 .program-card {
   position: relative;
   background: var(--bg-card);
@@ -540,6 +583,9 @@ body {
   font-size: 22px;
 }
 
+/* ══════════════════════════════════════
+   LoginPanel
+══════════════════════════════════════ */
 .login-panel {
   position: sticky;
   top: 0;
@@ -628,6 +674,9 @@ body {
   border-radius: 12px;
 }
 
+/* ══════════════════════════════════════
+   Dev override
+══════════════════════════════════════ */
 .dev-override {
   position: fixed;
   bottom: 16px;
@@ -669,18 +718,18 @@ body {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
+/* ══════════════════════════════════════
+   Toast (sonner overrides)
+══════════════════════════════════════ */
 [data-sonner-toaster] {
   font-family: var(--font-sans);
-}
-
-.spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }

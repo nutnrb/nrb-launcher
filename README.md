@@ -19,12 +19,12 @@ Built with [Tauri 2](https://v2.tauri.app/) (Rust + WebView) and React + Vite �
 
 ## Features
 
-- **Cross-platform desktop** — Windows, Linux, and macOS (Intel + Apple Silicon) from a single codebase
+- **Windows-native desktop** — built with Tauri 2 using the OS WebView; small installer, instant UI
 - **Lightweight** — ~10 MB installer; uses the OS's WebView instead of bundling a browser
 - **One-click program install** — downloads NRB programs as ZIPs, verifies SHA-256, extracts, and runs
 - **Safe upgrades with rollback** — every install is backed up so you can revert in one click
 - **Auto-update** — the launcher checks GitHub Releases and updates itself in the background
-- **Secure auth** — JWTs stored in the OS keychain (Windows Credential Manager / Linux Secret Service / macOS Keychain)
+- **Secure auth** — JWTs stored in the Windows Credential Manager via the OS keychain
 - **Hardware fingerprinting** — stable machine ID derived from MAC + CPU + disk serial, hashed client-side
 - **Tray icon** — keep the launcher in the system tray for quick access
 - **Subscription & wallet** — view credit balance and active subscription directly in the app
@@ -38,26 +38,18 @@ Download the latest release from the [Releases page](https://github.com/nutnrb/n
 
 | Platform | File | Instructions |
 |---|---|---|
-| Windows (recommended) | `NRB.Launcher_0.1.0_x64-setup.exe` | Run the NSIS installer |
-| Windows (Enterprise / GPO) | `NRB.Launcher_0.1.0_x64_en-US.msi` | Run the MSI installer |
-| Linux (Debian / Ubuntu) | `NRB.Launcher_0.1.0_amd64.deb` | `sudo dpkg -i NRB.Launcher_0.1.0_amd64.deb` |
-| Linux (other distros) | `NRB.Launcher_0.1.0_amd64.AppImage` | `chmod +x NRB.Launcher_0.1.0_amd64.AppImage && ./NRB.Launcher_0.1.0_amd64.AppImage` |
-| macOS (Apple Silicon) | `NRB.Launcher_0.1.0_aarch64.dmg` | Open DMG, drag to Applications |
-| macOS (Intel) | `NRB.Launcher_0.1.0_x64.dmg` | Open DMG, drag to Applications |
-| macOS (alternative, `.app.tar.gz`) | `NRB.Launcher_aarch64.app.tar.gz` / `NRB.Launcher_x64.app.tar.gz` | Extract and drag the `.app` to Applications |
+| Windows (recommended) | `NRB.Launcher_x.x.x_x64-setup.exe` | Run the NSIS installer |
+| Windows (Enterprise / GPO) | `NRB.Launcher_x.x.x_x64_en-US.msi` | Run the MSI installer |
 
-> **Note:** Binaries in v0.1.0 are **not code-signed**. First launch may show a Windows SmartScreen warning (click **More info → Run anyway**) or require **right-click → Open** on macOS. Signing is planned for a future release.
+> **NRB Launcher is Windows-only.** The project does not target macOS or Linux.
+
+> **Note:** Binaries are **not code-signed**. First launch may show a Windows SmartScreen warning (click **More info → Run anyway**). Signing is planned for a future release.
 
 ---
 
 ## Verify your download (SHA-256)
 
-Every published artifact has its SHA-256 checksum recorded in [`SHA256SUMS.txt`](SHA256SUMS.txt) for v0.1.0. Verify before installing:
-
-```bash
-# Linux / macOS
-sha256sum -c SHA256SUMS.txt --ignore-missing
-```
+Every published artifact has its SHA-256 checksum recorded in [`SHA256SUMS.txt`](SHA256SUMS.txt). Verify before installing:
 
 ```powershell
 # Windows (PowerShell 5+)
@@ -77,8 +69,6 @@ Compare the output against the line in `SHA256SUMS.txt` for the file you downloa
 - **Rust** stable — install via [rustup](https://rustup.rs)
 - Platform-specific dependencies:
   - **Windows:** WebView2 (preinstalled on Windows 11; Windows 10 needs the [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)) and the **MSVC C++ build tools** (Visual Studio Build Tools or a recent Visual Studio with the C++ workload)
-  - **Linux (Debian / Ubuntu):** `libwebkit2gtk-4.1-dev`, `libssl-dev`, `libappindicator3-dev`, `librsvg2-dev`, `patchelf`, `libxdo-dev`, `build-essential`, `pkg-config`, `curl`
-  - **macOS:** Xcode Command Line Tools — `xcode-select --install`
 
 ### Setup
 
@@ -102,18 +92,18 @@ This launches the Vite dev server on `http://localhost:1420` and opens the Tauri
 pnpm tauri build
 ```
 
-Artifacts land in `src-tauri/target/release/bundle/` (`.exe`/`.msi` on Windows, `.deb` + `.AppImage` on Linux, `.dmg` + `.app` on macOS).
+Artifacts land in `src-tauri/target/release/bundle/` (NSIS `.exe` and `.msi`).
 
-### Build for all platforms
+### Build (CI)
 
-Push a `v*` tag — GitHub Actions builds Windows, Ubuntu, and both macOS variants automatically and uploads them to a GitHub Release:
+Push a `v*` tag — GitHub Actions builds the Windows installer and MSI and publishes a GitHub Release:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
-See `.github/workflows/release.yml` for the full matrix.
+See `.github/workflows/release.yml`.
 
 ### Local development tips
 
@@ -121,7 +111,7 @@ See `.github/workflows/release.yml` for the full matrix.
   ```bash
   echo 'HUB_API_BASE=http://localhost:3000/api/v1' > .env
   ```
-- Logs are written to `%APPDATA%\com.nutnrb.launcher\logs\` (Windows) / `~/.local/share/com.nutnrb.launcher/logs/` (Linux) / `~/Library/Logs/com.nutnrb.launcher/` (macOS) and to stdout when launched from a terminal.
+- Logs are written to `%APPDATA%\com.nutnrb.launcher\logs\` and to stdout when launched from a terminal.
 
 ---
 
@@ -149,9 +139,9 @@ See `.github/workflows/release.yml` for the full matrix.
 │   └── .tauri-keygen          # Private signing key — NEVER COMMIT
 ├── .github/
 │   └── workflows/
-│       └── release.yml        # Multi-platform build + GitHub Release
+│       └── release.yml        # Windows build + GitHub Release
 ├── CHANGELOG.md
-├── SHA256SUMS.txt             # v0.1.0 artifact checksums
+├── SHA256SUMS.txt             # Latest artifact checksums
 ├── package.json
 ├── vite.config.ts
 └── tsconfig.json
@@ -211,16 +201,15 @@ Please be kind and patient — this is an early-stage project.
    git tag v0.X.Y
    git push origin v0.X.Y
    ```
-6. GitHub Actions (`.github/workflows/release.yml`) builds all platform binaries and publishes a GitHub Release automatically.
+6. GitHub Actions (`.github/workflows/release.yml`) builds the Windows installer + MSI and publishes a GitHub Release automatically.
 
 ---
 
 ## Roadmap
 
-- [ ] Code-signing for Windows + macOS
+- [ ] Code-signing for Windows
 - [ ] Production CSP and additional webview hardening
 - [ ] Auto-updater signed releases wired into CI
-- [ ] Expanded Linux distribution support (RPM, Flatpak)
 - [ ] In-app program marketplace
 
 ---

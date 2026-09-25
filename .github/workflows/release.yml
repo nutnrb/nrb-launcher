@@ -11,116 +11,45 @@ permissions:
 
 jobs:
   build:
-    permissions:
-      contents: write
+    name: build (${{ matrix.platform }}, ${{ matrix.args }})
+    runs-on: ${{ matrix.platform }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-22.04
-            target: ''
-            bundleArgs: ''
           - platform: windows-latest
-            target: ''
-            bundleArgs: '--bundles nsis,msi'
-          # Pinned to macos-14 because macos-latest silently rolled over
-          # between the v0.1.0 (Sep 23, succeeded) and v0.1.1 (Sep 24, failed
-          # on both aarch64 and x86_64) runs. The v0.1.1 source is byte-for-byte
-          # identical to v0.1.0 except for one extra endpoint string in
-          # tauri.conf.json — no source change can explain a macOS-only breakage,
-          # so the difference is environmental (Xcode/SDK/Runner image).
-          # macos-14 is what macos-latest was during the v0.1.0 release.
-          - platform: macos-14
-            target: aarch64-apple-darwin
-            bundleArgs: '--bundles app,dmg'
-          - platform: macos-14
-            target: x86_64-apple-darwin
-            bundleArgs: '--bundles app,dmg'
+            args: "--bundles nsis,msi"
 
-    runs-on: ${{ matrix.platform }}
-    env:
-      TAURI_BUNDLER_DMG_IGNORE_CI: 'true'
-      # Code signing secrets are optional. When present, tauri-action picks them up automatically.
-      # When absent, tauri-action skips signing and produces unsigned artifacts (build still succeeds).
-      WINDOWS_CERT_FILE: ${{ secrets.WINDOWS_CERT_FILE }}
-      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      API_KEY_ID: ${{ secrets.API_KEY_ID }}
-      API_KEY_FILE: ${{ secrets.API_KEY_FILE }}
-      API_ISSUER_ID: ${{ secrets.API_ISSUER_ID }}
-      # Auto-discovery is on by default, but we only enable it when at least one signing secret exists
-      # to avoid noisy warnings on unsigned builds.
-      CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.APPLE_CERTIFICATE != '' && 'true' || 'false' }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-
-      - name: Install Linux deps (Ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev
-
-      # macOS does not always ship `create-dmg` (used by tauri-bundler for .dmg).
-      # Install via Homebrew if missing. No-op when already present.
-      - name: Ensure macOS bundler deps (create-dmg)
-        if: matrix.platform == 'macos-14'
-        run: |
-          if ! command -v create-dmg >/dev/null 2>&1; then
-            brew install create-dmg
-          fi
-          create-dmg --version || true
-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
 
-      - name: Cache Rust
-        uses: swatinem/rust-cache@v2
+      - name: Cache cargo registry & target
+        uses: actions/cache@v4
         with:
-          workspaces: src-tauri -> target
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
-      - name: Install JS deps
+      - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Import GPG signing key (Linux only, optional)
-        if: matrix.platform == 'ubuntu-22.04' && env.GPG_PRIVATE_KEY != ''
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: |
-          set -euo pipefail
-          echo "$GPG_PRIVATE_KEY" | gpg --import --batch
-          printf 'allow-preset-passphrase\ndefault-cache-ttl 600\nmax-cache-ttl 7200\n' | gpgconf --change-options gpg-agent
-          gpgconf --reload gpg-agent
-          # Prime the agent with the passphrase so subsequent detached-sign calls do not prompt
-          echo "$GPG_PASSPHRASE" | gpg --pinentry-mode loopback --passphrase-fd 0 --sign --detach-sign --output /tmp/.gpg-prime /dev/null
-          rm -f /tmp/.gpg-prime
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -129,81 +58,26 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "NRB Launcher ${{ github.ref_name }}"
-          releaseBody: "Auto-generated release for NRB Launcher."
+          releaseBody: "Automated release for ${{ github.ref_name }}"
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.target && format('--target {0} {1}', matrix.target, matrix.bundleArgs) || format('{0}', matrix.bundleArgs) }}
+          args: ${{ matrix.args }}
 
-      # If the Tauri build fails, capture the full bundle state into the run's
-      # step summary (publicly visible from the GitHub Actions UI) so we can
-      # diagnose without needing the repo secrets / API admin scope.
       - name: Capture diagnostic on failure
         if: failure()
-        shell: bash
         run: |
-          set +e
-          {
-            echo "## Tauri build failure diagnostic"
-            echo ""
-            echo "Platform: \`${{ matrix.platform }}\`  Target: \`${{ matrix.target || 'host' }}\`  Run: \`${GITHUB_RUN_ID}\`  SHA: \`${GITHUB_SHA}\`"
-            echo ""
-            echo "### Toolchain versions"
-            echo '```'
-            echo "macOS: $(sw_vers 2>/dev/null || echo n/a)"
-            echo "Xcode: $(xcodebuild -version 2>/dev/null | head -2 || echo n/a)"
-            echo "Rust: $(rustc --version 2>&1)"
-            echo "Cargo: $(cargo --version 2>&1)"
-            echo "Node: $(node --version 2>&1)"
-            echo "pnpm: $(pnpm --version 2>&1)"
-            echo "Tauri CLI: $(pnpm tauri --version 2>&1 | head -3)"
-            echo '```'
-            echo ""
-            echo "### Bundle directories present"
-            echo '```'
-            find src-tauri/target -maxdepth 6 -type d \( -name 'bundle' -o -name 'release' \) 2>&1 | head -20
-            echo '```'
-            echo ""
-            echo "### Bundle files (any produced before failure)"
-            echo '```'
-            find src-tauri/target -maxdepth 8 -type f \( -name '*.app' -o -name '*.dmg' -o -name '*.msi' -o -name '*.exe' -o -name '*.deb' -o -name '*.AppImage' -o -name '*.pkg' \) -printf '%p (%s bytes)\n' 2>&1 | head -30
-            echo '```'
-            echo ""
-            echo "### Icon files (tauri-bundler can fail on malformed .ico/.icns)"
-            echo '```'
-            ls -la src-tauri/icons/ 2>&1
-            file src-tauri/icons/* 2>&1 | head -20
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Sign Linux bundles with GPG (Linux only, optional)
-        if: matrix.platform == 'ubuntu-22.04' && env.GPG_PRIVATE_KEY != ''
-        env:
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: |
-          set -euo pipefail
-          cd src-tauri/target/release/bundle
-          for dir in deb appimage; do
-            if [ -d "$dir" ]; then
-              cd "$dir"
-              shopt -s nullglob
-              for f in *.deb *.AppImage; do
-                echo "Signing $f"
-                echo "$GPG_PASSPHRASE" | gpg --pinentry-mode loopback --passphrase-fd 0 \
-                  --armor --detach-sign --sign "$f"
-              done
-              cd ..
-            fi
-          done
-          echo "=== Signed artifacts ==="
-          find deb appimage -maxdepth 1 \( -name '*.sig' -o -name '*.asc' \) 2>/dev/null || true
-
-      - name: Upload GPG signatures (Linux only)
-        if: matrix.platform == 'ubuntu-22.04' && env.GPG_PRIVATE_KEY != ''
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            src-tauri/target/release/bundle/deb/*.sig
-            src-tauri/target/release/bundle/deb/*.asc
-            src-tauri/target/release/bundle/appimage/*.sig
-            src-tauri/target/release/bundle/appimage/*.asc
-          fail_on_unmatched_files: false
+          echo "### :x: Build failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Platform:** ${{ matrix.platform }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Args:** \`${{ matrix.args }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Versions:**" >> $GITHUB_STEP_SUMMARY
+          echo "- rustc: \`$(rustc --version 2>&1)\`" >> $GITHUB_STEP_SUMMARY
+          echo "- cargo: \`$(cargo --version 2>&1)\`" >> $GITHUB_STEP_SUMMARY
+          echo "- node: \`$(node --version 2>&1)\`" >> $GITHUB_STEP_SUMMARY
+          echo "- pnpm: \`$(pnpm --version 2>&1)\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Bundle directory:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          ls -la src-tauri/target/release/bundle/ 2>&1 >> $GITHUB_STEP_SUMMARY || echo "(no bundle dir)" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

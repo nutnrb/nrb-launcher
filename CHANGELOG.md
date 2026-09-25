@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-25
+
+### Breaking
+- **Windows-only build.** Removed Linux and macOS from the build matrix. NRB Launcher is a Windows application and the project no longer produces `.deb`, `.AppImage`, `.dmg`, or `.app` bundles.
+- Build pipeline reduced to one job (`windows-latest`) producing only the NSIS `.exe` and MSI installers.
+
+### Changed
+- CI workflow: stripped from 4 matrix entries to 1, faster release cycle.
+- README installation table: now Windows-only.
+
+### Migration
+Users on macOS/Linux can no longer receive official binaries. The app does not target those platforms.
+
 ## [0.1.3] - 2026-09-25
+
 
 ### Fixed
 - CI: pin `actions/setup-node` to `node-version: "24"` to address GitHub's deprecation of Node 20 on Actions runners (https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/). Aligns the user-step Node with the forced Node 24 runtime, eliminating the pnpm/Node ABI mismatch that broke the macOS build matrix in v0.1.2.

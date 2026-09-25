@@ -1,11 +1,11 @@
-// NRB Launcher — single scrollable page: TopBar → Banner → ProgramList → LoginPanel.
-// v0.3.1 — restructured from a 2-column grid (left list + sticky right login)
-// into a single vertical stack so the login lives at the bottom of the page.
+// NRB Launcher — modern frameless game-launcher UI (v0.4.0).
+// Layout: custom TitleBar (drag region) -> scrollable shell -> Banner -> ProgramList -> LoginPanel.
+// Auth still bridges via postMessage from the embedded hub iframe.
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster, toast } from "sonner";
 
-import { TopBar } from "./components/TopBar";
+import { TitleBar } from "./components/TitleBar";
 import { Banner } from "./components/Banner";
 import { ProgramList } from "./components/ProgramList";
 import { LoginPanel } from "./components/LoginPanel";
@@ -13,7 +13,7 @@ import { LoginPanel } from "./components/LoginPanel";
 import { clearAuth, loadAuth, onHubMessage, saveAuth, type AuthUser } from "./lib/auth";
 import { useTheme } from "./hooks/useTheme";
 
-const LAUNCHER_VERSION = "0.3.1";
+const LAUNCHER_VERSION = "0.4.0";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,7 +40,6 @@ export default function App() {
 }
 
 function Shell() {
-  // Apply persisted light/dark theme (sets data-theme on <html>).
   useTheme();
 
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -52,8 +51,7 @@ function Shell() {
     if (cached) setUser(cached);
   }, []);
 
-  // Re-check auth periodically: another tab/window may have logged out via the
-  // hub iframe. Catches the rare case where we missed the postMessage.
+  // Re-check auth periodically: another tab/window may have logged out.
   useEffect(() => {
     if (!user) return;
     const id = setInterval(() => {
@@ -66,8 +64,7 @@ function Shell() {
     return () => clearInterval(id);
   }, [user]);
 
-  // Bridge: listen for `hub-login` / `hub-logout` postMessage events from the
-  // embedded login iframe. See hub repo `apps/web/src/app/(auth)/login/page.tsx`.
+  // Bridge: listen for `hub-login` / `hub-logout` postMessage events.
   useEffect(() => {
     return onHubMessage((msg) => {
       if (msg.type === "hub-login" && msg.user) {
@@ -112,23 +109,38 @@ function Shell() {
   };
 
   return (
-    <div className="app app--stack">
-      <TopBar version={LAUNCHER_VERSION} online={online} />
-      <Banner />
+    <div className="app-shell">
+      <TitleBar version={LAUNCHER_VERSION} online={online} />
 
-      {/* Section 1: Program list — full width, scrolls with the page. */}
-      <section className="stack-section stack-section--list">
-        <ProgramList loggedIn={user !== null} />
-      </section>
+      <main className="app-shell-main">
+        <div className="app-shell-inner">
+          <Banner />
 
-      {/* Section 2: Login — always at the bottom of the page. */}
-      <section className="stack-section stack-section--login">
-        <LoginPanel user={user} onLogout={handleLogout} />
-      </section>
+          <section className="shell-row">
+            <div>
+              <div className="section-title">โปรแกรม</div>
+              <div className="section-sub">
+                {user
+                  ? "คุณเข้าสู่ระบบแล้ว — สามารถดาวน์โหลด Member โปรแกรมได้"
+                  : "เข้าสู่ระบบเพื่อปลดล็อกโปรแกรมสำหรับสมาชิก"}
+              </div>
+            </div>
+            <ProgramList loggedIn={user !== null} />
+          </section>
 
-      <footer className="app-footer">
-        NRB Launcher v{LAUNCHER_VERSION} · {new Date().getFullYear()}
-      </footer>
+          <section className="shell-row">
+            <div>
+              <div className="section-title">บัญชี Hub</div>
+              <div className="section-sub">hub.nutnrb.com</div>
+            </div>
+            <LoginPanel user={user} onLogout={handleLogout} />
+          </section>
+
+          <footer className="app-footer">
+            NRB Launcher v{LAUNCHER_VERSION} · {new Date().getFullYear()}
+          </footer>
+        </div>
+      </main>
 
       <button
         type="button"

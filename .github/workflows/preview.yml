@@ -1,0 +1,61 @@
+name: Preview Build (push to main)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "*.md"
+      - ".gitignore"
+
+permissions:
+  contents: write
+
+jobs:
+  preview:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm build
+
+      - name: Build Tauri installer (preview pre-release)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: preview-${{ github.sha }}
+          releaseName: "Preview ${{ github.sha }}"
+          releaseBody: "Auto-generated preview build from commit ${{ github.sha }}.\n\n[See commit](${{ github.event.head_commit.url }})"
+          releaseDraft: false
+          prerelease: true
+          includeUpdaterJson: true
+          updaterJsonKeepDays: 90
+          args: --target x86_64-pc-windows-msvc
+
+      # Keep a stable `preview-latest` alias so the in-app updater can
+      # always fetch the most recent preview manifest via a fixed URL.
+      - name: Repoint preview-latest tag to this build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete preview-latest --yes || true
+          gh release create preview-latest \
+            --repo ${{ github.repository }} \
+            --target preview-${{ github.sha }} \
+            --prerelease \
+            --notes "Rolling pointer to the most recent preview build. Do not download manually; the in-app updater reads latest.json from this tag."
+

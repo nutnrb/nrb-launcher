@@ -1,6 +1,6 @@
 [package]
 name = "nrb-launcher"
-version = "0.4.0"
+version = "0.4.1"
 description = "NRB Launcher — desktop app"
 authors = ["NRB Team"]
 license = "MIT"

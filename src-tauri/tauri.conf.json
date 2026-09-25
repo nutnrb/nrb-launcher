@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "NRB Launcher",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "identifier": "com.nutnrb.launcher",
   "build": {
     "frontendDist": "../dist",
@@ -66,6 +66,7 @@
       "active": true,
       "dialog": true,
       "endpoints": [
+        "https://github.com/nutnrb/nrb-launcher/releases/download/preview-latest/latest.json",
         "https://github.com/nutnrb/nrb-launcher/releases/latest/download/latest.json",
         "https://github.com/nutnrb/nrb-launcher/releases/download/v{{version}}/latest.json"
       ],

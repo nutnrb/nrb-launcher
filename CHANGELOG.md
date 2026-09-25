@@ -5,6 +5,27 @@ All notable changes to NRB Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] - 2026-09-25
+
+### Auto Pre-release + In-app Update
+
+- Every push to `main` now automatically publishes a GitHub **Pre-release** (`preview-<sha>`) with the Windows installer attached.
+- A rolling `preview-latest` tag is repointed to the newest preview so the in-app updater can always fetch the latest manifest via a fixed URL.
+- App checks for updates on launch and shows a one-click update banner with download progress.
+- Stable releases still happen via `v*` tags (handled by `release.yml`).
+
+### Technical
+- New: `.github/workflows/preview.yml` (replaces `dev-build.yml` for the pre-release channel).
+- Removed: `.github/workflows/dev-build.yml` (functionality now covered by `preview.yml`).
+- `src-tauri/tauri.conf.json`: `plugins.updater.endpoints` now includes `releases/download/preview-latest/latest.json` as the first endpoint.
+- New: `src/components/UpdateBanner.tsx` — uses `@tauri-apps/plugin-updater`'s `check()` + `Update.downloadAndInstall()` for one-click updates.
+- `src/App.tsx`: renders `<UpdateBanner />` above `<Banner />`; `LAUNCHER_VERSION` bumped to 0.4.1.
+- Versions bumped in `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json` to 0.4.1.
+
+### Workflow
+- Preview (push to main): always publishes a pre-release installer + repoints `preview-latest`.
+- Stable (tag v*): handled by `release.yml` (unchanged).
+
 ## [0.4.0] - 2026-09-25
 
 ### Modern Frameless UI (Game Launcher Style)

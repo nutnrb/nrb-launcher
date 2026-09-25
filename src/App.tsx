@@ -9,11 +9,12 @@ import { TitleBar } from "./components/TitleBar";
 import { Banner } from "./components/Banner";
 import { ProgramList } from "./components/ProgramList";
 import { LoginPanel } from "./components/LoginPanel";
+import { UpdateBanner } from "./components/UpdateBanner";
 
 import { clearAuth, loadAuth, onHubMessage, saveAuth, type AuthUser } from "./lib/auth";
 import { useTheme } from "./hooks/useTheme";
 
-const LAUNCHER_VERSION = "0.4.0";
+const LAUNCHER_VERSION = "0.4.1";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -114,6 +115,7 @@ function Shell() {
 
       <main className="app-shell-main">
         <div className="app-shell-inner">
+          <UpdateBanner />
           <Banner />
 
           <section className="shell-row">

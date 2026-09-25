@@ -52,10 +52,31 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete preview-latest --yes || true
-          gh release create preview-latest \
-            --repo ${{ github.repository }} \
-            --target preview-${{ github.sha }} \
-            --prerelease \
-            --notes "Rolling pointer to the most recent preview build. Do not download manually; the in-app updater reads latest.json from this tag."
+          set -e
+          # Delete the existing preview-latest release if any. Use || true
+          # so first run is fine; continue-on-error so we still try the
+          # git-tag fallback below.
+          gh release delete preview-latest --yes 2>/dev/null || true
+          gh release create preview-latest
+            --repo "${{ github.repository }}"
+            --target "preview-${{ github.sha }}"
+            --prerelease
+            --notes "Rolling pointer to the most recent preview build. The in-app updater reads latest.json from this tag."
+        continue-on-error: true
+
+      # Always make sure the preview-latest *git tag* exists. Without it
+      # the updater endpoint `releases/download/preview-latest/latest.json`
+      # 404s and no in-app update is offered.
+      - name: Ensure preview-latest git tag exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --tags origin | grep -q "refs/tags/preview-latest$"; then
+            git tag -d preview-latest || true
+          fi
+          git tag preview-latest "preview-${{ github.sha }}"
+          git push origin "preview-latest" --force
 

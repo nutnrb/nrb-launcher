@@ -16,6 +16,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -64,19 +66,22 @@ jobs:
             --notes "Rolling pointer to the most recent preview build. The in-app updater reads latest.json from this tag."
         continue-on-error: true
 
-      # Always make sure the preview-latest *git tag* exists. Without it
-      # the updater endpoint `releases/download/preview-latest/latest.json`
-      # 404s and no in-app update is offered.
+      # Make sure the *git tag* preview-latest points at the just-built
+      # commit. We use the GitHub API so we don't depend on the local
+      # checkout's tag set (default fetch-depth is shallow).
       - name: Ensure preview-latest git tag exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git ls-remote --tags origin | grep -q "refs/tags/preview-latest$"; then
-            git tag -d preview-latest || true
-          fi
-          git tag preview-latest "preview-${{ github.sha }}"
-          git push origin "preview-latest" --force
+          SHA="preview-${{ github.sha }}"
+          # Get the commit SHA that the preview tag points to.
+          TARGET_SHA=$(gh api "repos/${{ github.repository }}/git/refs/tags/${SHA}" --jq '.object.sha')
+          echo "preview-latest -> ${SHA} (${TARGET_SHA})"
+          # Delete the existing preview-latest ref if any.
+          gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/preview-latest" >/dev/null 2>&1 || true
+          # Create it pointing at the same commit as the preview tag.
+          gh api -X POST "repos/${{ github.repository }}/git/refs" \
+            -f "ref=refs/tags/preview-latest" \
+            -f "sha=${TARGET_SHA}"
 

@@ -66,22 +66,30 @@ jobs:
             --notes "Rolling pointer to the most recent preview build. The in-app updater reads latest.json from this tag."
         continue-on-error: true
 
-      # Make sure the *git tag* preview-latest points at the just-built
-      # commit. We use the GitHub API so we don't depend on the local
-      # checkout's tag set (default fetch-depth is shallow).
-      - name: Ensure preview-latest git tag exists
+      # Copy latest.json from the just-built preview-<sha> release to the
+      # rolling preview-latest release so the in-app updater has a stable
+      # URL to read.
+      - name: Propagate latest.json to preview-latest release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          SHA="preview-${{ github.sha }}"
-          # Get the commit SHA that the preview tag points to.
-          TARGET_SHA=$(gh api "repos/${{ github.repository }}/git/refs/tags/${SHA}" --jq '.object.sha')
-          echo "preview-latest -> ${SHA} (${TARGET_SHA})"
-          # Delete the existing preview-latest ref if any.
-          gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/preview-latest" >/dev/null 2>&1 || true
-          # Create it pointing at the same commit as the preview tag.
-          gh api -X POST "repos/${{ github.repository }}/git/refs" \
-            -f "ref=refs/tags/preview-latest" \
-            -f "sha=${TARGET_SHA}"
+          if ! gh release view preview-latest >/dev/null 2>&1; then
+            gh release create preview-latest \
+              --repo "${{ github.repository }}" \
+              --target "preview-${{ github.sha }}" \
+              --prerelease \
+              --notes "Rolling pointer to the most recent preview. The in-app updater reads latest.json from this release."
+          fi
+          # Download latest.json from the per-commit preview release and
+          # upload it to the rolling preview-latest release so the
+          # endpoint below always serves the newest manifest.
+          TMP=$(mktemp -d)
+          gh release download "preview-${{ github.sha }}" \
+            --repo "${{ github.repository }}" \
+            --pattern latest.json \
+            --dir "$TMP"
+          gh release upload preview-latest "$TMP/latest.json" \
+            --repo "${{ github.repository }}" \
+            --clobber
 

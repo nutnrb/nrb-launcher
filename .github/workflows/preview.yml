@@ -71,10 +71,16 @@ jobs:
             --notes "Rolling pointer to the most recent preview build. The in-app updater reads latest.json from this tag."
         continue-on-error: true
 
-      # Copy latest.json from the just-built preview-<sha> release to the
-      # rolling preview-latest release so the in-app updater has a stable
-      # URL to read.
+      # Propagate latest.json from the just-built preview-<sha> release to
+      # the rolling preview-latest release so the in-app updater has a
+      # stable URL to read. Marked continue-on-error because this only
+      # works when tauri-action actually emitted latest.json, which
+      # requires the TAURI_SIGNING_PRIVATE_KEY secret to be set. Without
+      # it the pre-release installer still publishes; this step just
+      # can't wire the in-app update.
       - name: Propagate latest.json to preview-latest release
+        if: always()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -86,15 +92,21 @@ jobs:
               --prerelease \
               --notes "Rolling pointer to the most recent preview. The in-app updater reads latest.json from this release."
           fi
-          # Download latest.json from the per-commit preview release and
-          # upload it to the rolling preview-latest release so the
-          # endpoint below always serves the newest manifest.
           TMP=$(mktemp -d)
-          gh release download "preview-${{ github.sha }}" \
-            --repo "${{ github.repository }}" \
-            --pattern latest.json \
-            --dir "$TMP"
-          gh release upload preview-latest "$TMP/latest.json" \
-            --repo "${{ github.repository }}" \
-            --clobber
+          # tauri-action emits the manifest as `latest-${targetTriple}.json`.
+          # If it doesn't exist, the in-app update path isn't wired yet
+          # (need to set TAURI_SIGNING_PRIVATE_KEY secret) - exit 0 so we
+          # don't fail the whole job.
+          if ! gh release download "preview-${{ github.sha }}" \
+              --repo "${{ github.repository }}" \
+              --pattern "latest*.json" \
+              --dir "$TMP" 2>/dev/null; then
+            echo "::warning::No latest*.json found in preview-${{ github.sha }} release. In-app update won't work until TAURI_SIGNING_PRIVATE_KEY secret is set."
+            exit 0
+          fi
+          for f in "$TMP"/latest*.json; do
+            gh release upload preview-latest "$f" \
+              --repo "${{ github.repository }}" \
+              --clobber
+          done
 

@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-09-25
+
+### Fixed
+- CI: pin `actions/setup-node` to `node-version: "24"` to address GitHub's deprecation of Node 20 on Actions runners (https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/). Aligns the user-step Node with the forced Node 24 runtime, eliminating the pnpm/Node ABI mismatch that broke the macOS build matrix in v0.1.2.
+
 ## [0.1.2] - 2026-09-24
+
 
 ### Fixed
 - macOS builds failed due to `macos-latest` runner image rolling forward between v0.1.0 and v0.1.1; pinned both macOS matrix entries to `macos-14` and added `create-dmg` step.

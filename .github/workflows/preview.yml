@@ -38,6 +38,11 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Required for includeUpdaterJson to actually emit latest.json.
+          # User must set these secrets in the repo's settings; without
+          # them the pre-release will publish but no in-app update is offered.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: preview-${{ github.sha }}
           releaseName: "Preview ${{ github.sha }}"

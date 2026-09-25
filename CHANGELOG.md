@@ -5,7 +5,28 @@ All notable changes to NRB Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.3.0] - 2026-09-25
+
+### Added
+- **Single-screen home UI**: Hub-style glassmorphism layout with `TopBar`, dismissible `Banner`, search + 2 program sections, and a side `LoginPanel`.
+- **Program catalog** (`src/lib/programs.ts`): 2 legacy + 3 member programs with status dots (gray / green / red) and a locked overlay for `requiresLogin` items.
+- **Tauri command bridge** (`src/lib/tauri.ts`, `src-tauri/src/launcher.rs`): typed wrappers around `get_programs_dir`, `check_program_installed`, `read_license_status`, `download_program` (with `download_progress` events), `extract_zip`, `launch_program`.
+- **Announcement banner** (`src/lib/announcements.ts`): fetches `https://hub.nutnrb.com/api/v1/announcements?active=true`, gracefully degrades to `[]` offline.
+- **Hub iframe login** (`src/components/LoginPanel.tsx`): embeds `hub.nutnrb.com/login?embed=1` with `postMessage('hub-login')` bridge.
+- **Auth state helper** (`src/lib/auth.ts`): localStorage-backed `AuthUser`, `onHubMessage()` listener, `saveAuth/loadAuth/clearAuth`.
+- **Light/dark theme** (`src/hooks/useTheme.ts`, `src/index.css`): Hub palette (Electric Blue `#00b4ff`, Kanit font, glass surfaces, dark variant).
+- **Dev override button**: "Simulate login (dev)" pill in the corner so local iteration works without a wired hub postMessage.
+- **`@tanstack/react-query`, `lucide-react`, `sonner`** added to `package.json`.
+- **`dev-build.yml` workflow**: every push to `main`, `dev`, `feat/**` builds the Windows NSIS + MSI and uploads them as workflow artifacts (no release, no tag).
+- **`release.yml` updated**: `branches-ignore: [main, "feat/**"]` on the push trigger so `dev-build.yml` doesn't double-fire the release pipeline.
+
+### Hub-side dependencies
+- Hub login page must `window.parent.postMessage({ type: 'hub-login', user: { name, email } }, '*')` on successful sign-in when `?embed=1` is present.
+- `/api/v1/announcements?active=true` already exists in hub; launcher degrades to `[]` if it 404s.
+
+### Notes
+- First release that **depends on hub-side embed support** for full login flow; dev override covers local iteration in the meantime.
+- `tauri-plugin-shell` and `tauri-plugin-fs` are now used; capabilities/permissions updated accordingly.
 
 ## [0.2.0] - 2026-09-25
 
@@ -18,47 +39,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - README installation table: now Windows-only.
 
 ### Migration
-Users on macOS/Linux can no longer receive official binaries. The app does not target those platforms.
-
-## [0.1.3] - 2026-09-25
-
-
-### Fixed
-- CI: pin `actions/setup-node` to `node-version: "24"` to address GitHub's deprecation of Node 20 on Actions runners (https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/). Aligns the user-step Node with the forced Node 24 runtime, eliminating the pnpm/Node ABI mismatch that broke the macOS build matrix in v0.1.2.
-
-## [0.1.2] - 2026-09-24
-
-
-### Fixed
-- macOS builds failed due to `macos-latest` runner image rolling forward between v0.1.0 and v0.1.1; pinned both macOS matrix entries to `macos-14` and added `create-dmg` step.
-- Restored diagnostic-on-failure step so future failures are publicly viewable in the Actions Summary tab.
-
-## [0.1.1] - 2026-09-24
-
-### Changed
-- CI: also produce Windows `.msi` bundle (in addition to NSIS `.exe`) for enterprise/GPO deployment
-- Docs: comprehensive README + SHA256SUMS for verification
-- CI: code signing infrastructure (GPG for Linux, ready for Windows cert and macOS Developer ID)
-
-### Verification
-All 7 artifacts from v0.1.0 smoke-tested on Linux x86_64:
-- `.deb` installs cleanly via dpkg, binary runs under xvfb
-- `.AppImage` extracts and runs under xvfb
-- `.exe` valid NSIS-3 PE32+ Unicode installer
-- macOS `.app` bundles (x64 + aarch64) have correct structure
-- macOS `.dmg` (x64 + aarch64) are valid Apple HFS disk images
-
-## [0.1.0] - 2026-09-24
-
-### Added
-- Initial public release of NRB Launcher
-- Multi-platform binaries:
-  - Windows: NSIS installer (.exe)
-  - Linux: .deb package and AppImage
-  - macOS: Apple Silicon + Intel builds (.dmg + .app)
-- Built automatically via GitHub Actions on every push to a `v*` tag
-
-### Notes
-- SmartScreen on Windows: unsigned binary — users see a warning on first launch.
-- macOS: unsigned — users need to right-click + Open the first time.
-- Code signing and auto-updater planned for a future release.
+- macOS / Linux users should run the prebuilt Windows `.exe` / `.msi` in a VM, or build from source on Windows.

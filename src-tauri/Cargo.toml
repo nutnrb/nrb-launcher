@@ -1,6 +1,6 @@
 [package]
 name = "nrb-launcher"
-version = "0.2.0"
+version = "0.3.0"
 description = "NRB Launcher — desktop app"
 authors = ["NRB Team"]
 license = "MIT"
@@ -22,6 +22,7 @@ tauri-plugin-fs = "=2.5.2"
 tauri-plugin-http = { version = "=2.6.1", features = ["unsafe-headers"] }
 tauri-plugin-notification = "=2.4.0"
 tauri-plugin-os = "=2.3.2"
+tauri-plugin-shell = "=2.3.6"
 tauri-plugin-store = "=2.4.5"
 tauri-plugin-updater = "=2.12.0"
 
@@ -29,11 +30,13 @@ reqwest = { version = "0.12", features = ["stream", "json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
-zip = "0.6"
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
 keyring = "3"
 dirs = "5"
 futures-util = "0.3"
 hostname = "0.3"
+tokio = { version = "1", features = ["fs", "rt", "sync"] }
+futures = "0.3"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"

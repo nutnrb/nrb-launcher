@@ -3,6 +3,7 @@ pub mod api;
 pub mod auth;
 pub mod download;
 pub mod hardware;
+pub mod launcher;
 pub mod store;
 pub mod update;
 
@@ -18,6 +19,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(UpdateStateHandle::new(current_version))
@@ -32,6 +34,13 @@ pub fn run() {
             update::download_and_install_update,
             update::get_update_state,
             update::get_launcher_version,
+            // v0.3.0 — launcher surface
+            launcher::get_programs_dir,
+            launcher::check_program_installed,
+            launcher::read_license_status,
+            launcher::download_program,
+            launcher::extract_zip,
+            launcher::launch_program,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

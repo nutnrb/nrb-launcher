@@ -24,11 +24,47 @@ Built with [Tauri 2](https://v2.tauri.app/) (Rust + WebView) and React + Vite �
 - **One-click program install** — downloads NRB programs as ZIPs, verifies SHA-256, extracts, and runs
 - **Safe upgrades with rollback** — every install is backed up so you can revert in one click
 - **Auto-update** — the launcher checks GitHub Releases and updates itself in the background
-- **Secure auth** — JWTs stored in the Windows Credential Manager via the OS keychain
-- **Hardware fingerprinting** — stable machine ID derived from MAC + CPU + disk serial, hashed client-side
+- **Hub-style UI** — single-screen glassmorphism layout (Electric Blue + Kanit) matching `hub.nutnrb.com`
+- **Embed login** — iframe of `hub.nutnrb.com/login?embed=1` with `postMessage` bridge for auth sync
 - **Tray icon** — keep the launcher in the system tray for quick access
-- **Subscription & wallet** — view credit balance and active subscription directly in the app
 - **Offline-friendly** — once installed, programs run locally; only updates and Hub calls hit the network
+
+---
+
+## Development Workflow
+
+### Quick iterate (local)
+
+```bash
+pnpm install
+pnpm tauri dev          # hot-reload desktop window
+```
+
+The first `tauri dev` will compile Rust dependencies (~3–5 min). After that, Vite HMR keeps the React UI hot and Rust changes rebuild automatically.
+
+Use the **Simulate login (dev)** pill in the bottom-right corner of the window to test the logged-in state without wiring hub postMessage.
+
+### Test latest build (CI artifact)
+
+Every push to `main` / `dev` / `feat/*` triggers [`.github/workflows/dev-build.yml`](.github/workflows/dev-build.yml). The latest Windows installer is uploaded as a downloadable artifact:
+
+→ <https://github.com/nutnrb/nrb-launcher/actions> → select **"Dev Build"** → scroll to **Artifacts** → download `nrb-launcher-dev.zip`
+
+Two artifacts are produced:
+
+- `nrb-launcher-dev` — NSIS `.exe` installer
+- `nrb-launcher-dev-msi` — MSI installer for enterprise deployment
+
+### Production release
+
+Push a version tag:
+
+```bash
+git tag v0.3.0
+git push origin v0.3.0
+```
+
+This triggers [`.github/workflows/release.yml`](.github/workflows/release.yml) and publishes a GitHub Release with the signed NSIS + MSI installers.
 
 ---
 
@@ -38,187 +74,4 @@ Download the latest release from the [Releases page](https://github.com/nutnrb/n
 
 | Platform | File | Instructions |
 |---|---|---|
-| Windows (recommended) | `NRB.Launcher_x.x.x_x64-setup.exe` | Run the NSIS installer |
-| Windows (Enterprise / GPO) | `NRB.Launcher_x.x.x_x64_en-US.msi` | Run the MSI installer |
 
-> **NRB Launcher is Windows-only.** The project does not target macOS or Linux.
-
-> **Note:** Binaries are **not code-signed**. First launch may show a Windows SmartScreen warning (click **More info → Run anyway**). Signing is planned for a future release.
-
----
-
-## Verify your download (SHA-256)
-
-Every published artifact has its SHA-256 checksum recorded in [`SHA256SUMS.txt`](SHA256SUMS.txt). Verify before installing:
-
-```powershell
-# Windows (PowerShell 5+)
-Get-FileHash .\<artifact-name> -Algorithm SHA256
-```
-
-Compare the output against the line in `SHA256SUMS.txt` for the file you downloaded.
-
----
-
-## Development
-
-### Prerequisites
-
-- **Node.js** ≥ 20 (we test on 22.x)
-- **pnpm** ≥ 8 — `npm install -g pnpm`
-- **Rust** stable — install via [rustup](https://rustup.rs)
-- Platform-specific dependencies:
-  - **Windows:** WebView2 (preinstalled on Windows 11; Windows 10 needs the [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)) and the **MSVC C++ build tools** (Visual Studio Build Tools or a recent Visual Studio with the C++ workload)
-
-### Setup
-
-```bash
-git clone https://github.com/nutnrb/nrb-launcher.git
-cd nrb-launcher
-pnpm install
-```
-
-### Run in development mode (hot reload)
-
-```bash
-pnpm tauri dev
-```
-
-This launches the Vite dev server on `http://localhost:1420` and opens the Tauri window. Frontend edits hot-reload; Rust changes trigger an automatic rebuild.
-
-### Build for your current platform
-
-```bash
-pnpm tauri build
-```
-
-Artifacts land in `src-tauri/target/release/bundle/` (NSIS `.exe` and `.msi`).
-
-### Build (CI)
-
-Push a `v*` tag — GitHub Actions builds the Windows installer and MSI and publishes a GitHub Release:
-
-```bash
-git tag vX.Y.Z
-git push origin vX.Y.Z
-```
-
-See `.github/workflows/release.yml`.
-
-### Local development tips
-
-- Point the launcher at a local Hub by setting `HUB_API_BASE` in a `.env` file:
-  ```bash
-  echo 'HUB_API_BASE=http://localhost:3000/api/v1' > .env
-  ```
-- Logs are written to `%APPDATA%\com.nutnrb.launcher\logs\` and to stdout when launched from a terminal.
-
----
-
-## Project Structure
-
-```
-.
-├── src/                       # React + TypeScript frontend (Vite)
-│   ├── App.tsx                # Main UI (login, dashboard, programs, wallet)
-│   ├── main.tsx
-│   ├── api.ts                 # Thin wrapper around the Rust commands
-│   └── styles.css
-├── src-tauri/                 # Rust backend (Tauri)
-│   ├── src/
-│   │   ├── main.rs            # Entry — delegates to lib::run
-│   │   ├── lib.rs             # Plugin + command registration
-│   │   ├── auth.rs            # Login + JWT storage (OS keyring)
-│   │   ├── api.rs             # Hub HTTP client
-│   │   ├── download.rs        # ZIP download + extract + SHA-256 verify
-│   │   ├── hardware.rs        # Machine fingerprint (MAC + CPU + disk)
-│   │   ├── store.rs           # Local state persistence
-│   │   └── update.rs          # Auto-update integration
-│   ├── Cargo.toml
-│   ├── tauri.conf.json
-│   └── .tauri-keygen          # Private signing key — NEVER COMMIT
-├── .github/
-│   └── workflows/
-│       └── release.yml        # Windows build + GitHub Release
-├── CHANGELOG.md
-├── SHA256SUMS.txt             # Latest artifact checksums
-├── package.json
-├── vite.config.ts
-└── tsconfig.json
-```
-
----
-
-## Configuration
-
-By default, the launcher talks to:
-
-- **Hub API:** `https://hub.nutnrb.com/api/v1`
-- **Download CDN:** `https://downloads.nutnrb.com`
-- **Update channel:** `https://github.com/nutnrb/nrb-launcher/releases/latest/download/latest.json`
-
-To customize, edit the constants in `src-tauri/src/api.rs` and the updater block in `src-tauri/tauri.conf.json`.
-
----
-
-## Security
-
-- JWT tokens live in the OS-native secret store (via the [`keyring`](https://crates.io/crates/keyring) crate) — never written to disk in plaintext.
-- Hardware fingerprints are one-way hashed with SHA-256 before leaving the machine.
-- All downloads are over HTTPS and verified against published SHA-256 hashes.
-- The Tauri CSP is currently permissive (`null`) for development — tighten it once production CSP rules are finalized.
-- **Never commit `src-tauri/.tauri-keygen`.** It is already in `.gitignore`.
-
----
-
-## Contributing
-
-Contributions of all sizes are welcome — bug reports, feature requests, docs, and pull requests.
-
-1. Open an [Issue](https://github.com/nutnrb/nrb-launcher/issues) for anything that might need discussion before code lands.
-2. For ideas or questions, use [GitHub Discussions](https://github.com/nutnrb/nrb-launcher/discussions).
-3. For pull requests:
-   - Fork the repo and create a feature branch (`git checkout -b feat/your-thing`)
-   - Keep changes focused; one logical change per PR
-   - Run `pnpm tauri build` locally to make sure both frontend and Rust compile clean
-   - Open a PR against `main` with a clear description and screenshots if UI changed
-
-Please be kind and patient — this is an early-stage project.
-
----
-
-## Release Process (maintainers)
-
-1. Bump `version` in `package.json` and `src-tauri/tauri.conf.json` (keep them in sync).
-2. Add a new entry to [`CHANGELOG.md`](CHANGELOG.md).
-3. Regenerate `SHA256SUMS.txt` once the artifacts are built:
-   ```bash
-   sha256sum NRB.Launcher_* > SHA256SUMS.txt
-   ```
-4. Commit and push to `main`.
-5. Tag and push the release:
-   ```bash
-   git tag v0.X.Y
-   git push origin v0.X.Y
-   ```
-6. GitHub Actions (`.github/workflows/release.yml`) builds the Windows installer + MSI and publishes a GitHub Release automatically.
-
----
-
-## Roadmap
-
-- [ ] Code-signing for Windows
-- [ ] Production CSP and additional webview hardening
-- [ ] Auto-updater signed releases wired into CI
-- [ ] In-app program marketplace
-
----
-
-## License
-
-[MIT](LICENSE) © NRB Team.
-
-## Acknowledgments
-
-Built with [Tauri](https://tauri.app/) — tiny, blazingly fast binaries.
-Icons by the Tauri project and the NRB design team.

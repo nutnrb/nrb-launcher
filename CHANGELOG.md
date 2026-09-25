@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Every push to `main` now automatically publishes a GitHub **Pre-release** (`preview-<sha>`) with the Windows installer attached.
 - A rolling `preview-latest` tag is repointed to the newest preview so the in-app updater can always fetch the latest manifest via a fixed URL.
-- App checks for updates on launch and shows a one-click update banner with download progress.
+- App checks for updates on launch and shows a one-click update banner with download progress. _Requires `TAURI_SIGNING_PRIVATE_KEY` + `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repo secrets to be set manually._
 - Stable releases still happen via `v*` tags (handled by `release.yml`).
 
 ### Technical

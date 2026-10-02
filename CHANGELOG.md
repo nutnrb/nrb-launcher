@@ -5,6 +5,51 @@ All notable changes to NRB Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0-preview-cutai-phase0] - 2026-10-02
+
+### CutAI v3 — Phase 0 "Hello GPU". Verification only — no jobs yet.
+
+- New `cutai` Cargo feature flag (off by default). Enable with
+  `cargo check --features cutai` or `pnpm tauri build --features cutai`.
+  Default build is identical to v0.4.x.
+- `src-tauri/src/api.rs`: new `HubClient::post<TReq, TRes>` mirroring the
+  existing `get()` — same bearer-auth helper, same error mapping.
+  Subagents: Phase 1 will add CutAI POST shapes to this same method.
+- `src-tauri/src/agent/` (new module, feature-gated)
+    - `gpu.rs`: GPU detection cascade — NVML via `nvml-wrapper` →
+      `nvidia-smi --query-gpu=name,memory.total` → CPU fallback. Exposes
+      a serializable `GpuInfo` struct.
+    - `hub_client.rs`: Tauri commands `cutai_register_device` and
+      `cutai_heartbeat`. Reads the OS keyring via the existing
+      `crate::store` helpers; persists `cutai_device_token` +
+      `cutai_device_id`. Heartbeat re-detects GPU at most once per 60s.
+    - `mod.rs`: feature-gated submodule declarations.
+- `src-tauri/src/lib.rs`: registers the new commands via a second
+  `tauri::generate_handler!` invocation guarded by `#[cfg(feature =
+  "cutai")]`. The macro doesn't expand `#[cfg(...)]` inside its body, so
+  the CutAI handlers live in their own invocation.
+- `src-tauri/Cargo.toml`: add `nvml-wrapper = "0.13"` (optional, behind
+  `cutai` feature); add `process` + `io-util` to tokio features (for
+  Phase 1's `tokio::process::Command`).
+- `src/hooks/useCutaiHeartbeat.ts` (new): polls `cutai_heartbeat`
+  every 30s while the user is logged in.
+- `src/components/CutaiStatusBadge.tsx` (new): 🟢/⚪ dot + "CutAI"
+  label rendered in the titlebar. Read-only indicator.
+- `src/components/TitleBar.tsx`: new optional `loggedIn` prop renders
+  the badge. (Spec said "TopBar"; App.tsx actually mounts `TitleBar`,
+  so the badge lands there.)
+- `src/App.tsx`: passes `loggedIn={user !== null}` to TitleBar.
+
+### Changed
+- Version bumped 0.4.2 → 0.5.0 in `package.json`, `src-tauri/Cargo.toml`,
+  `src-tauri/tauri.conf.json`, and the hardcoded `LAUNCHER_VERSION` in
+  `src/App.tsx` (which was previously stale at 0.4.1).
+
+### Acceptance
+- `cargo check` succeeds (default features).
+- `cargo check --features cutai` succeeds.
+- `pnpm tsc --noEmit` succeeds.
+
 ## [0.4.1] - 2026-09-25
 
 ### Auto Pre-release + In-app Update

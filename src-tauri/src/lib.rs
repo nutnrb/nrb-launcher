@@ -7,13 +7,16 @@ pub mod launcher;
 pub mod store;
 pub mod update;
 
+#[cfg(feature = "cutai")]
+pub mod agent;
+
 use update::UpdateStateHandle;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let current_version = env!("CARGO_PKG_VERSION").to_string();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
@@ -41,7 +44,18 @@ pub fn run() {
             launcher::download_program,
             launcher::extract_zip,
             launcher::launch_program,
-        ])
+        ]);
+
+    // v0.5.0 — CutAI Phase 0 commands. Feature-gated: only present when
+    // built with `--features cutai`. Done as a separate `generate_handler!`
+    // because the macro does not expand `#[cfg(...)]` inside its body.
+    #[cfg(feature = "cutai")]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        crate::agent::hub_client::cutai_register_device,
+        crate::agent::hub_client::cutai_heartbeat,
+    ]);
+
+    builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

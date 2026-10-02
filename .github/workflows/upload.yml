@@ -110,10 +110,14 @@ jobs:
       - name: Sign installer for R2 upload
         shell: bash
         env:
-          # tauri-cli >= 2.x automatically reads TAURI_SIGNING_PRIVATE_KEY and
-          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD from env. See
-          # https://v2.tauri.app/reference/cli/#signer-sign.
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # Only set the *password* env. tauri-cli reads
+          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD automatically. We
+          # deliberately do NOT set TAURI_SIGNING_PRIVATE_KEY — clap
+          # errors with "cannot be used with '--private-key
+          # <PRIVATE_KEY>'" (see tauri-cli v2 "ps–> SignerConf::from")
+          # if both are present. The key instead goes through a temp
+          # file via --private-key-path, which is also Windows-safe (LF
+          # vs CRLF ambiguity of an inline env string is bypassed).
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
@@ -131,23 +135,17 @@ jobs:
           fi
           echo "Signing: ${EXE_PATH}"
 
-          if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
-            echo "::error::Secret TAURI_SIGNING_PRIVATE_KEY is missing in this repo. Add it under Settings → Secrets and variables → Actions. See docs/CODE_SIGNING.md for the expected format."
-            exit 1
-          fi
           if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
             echo "::error::Secret TAURI_SIGNING_PRIVATE_KEY_PASSWORD is missing in this repo. Add it under Settings → Secrets and variables → Actions."
             exit 1
           fi
 
-          # Write the private key to a temp file rather than relying on
-          # `pnpm tauri signer sign` auto-reading TAURI_SIGNING_PRIVATE_KEY.
-          # Some tauri-cli / Windows combinations handle the env string less
-          # robustly than --private-key-path with an explicit file. Stdin
-          # encoding (LF vs CRLF) of an inline string is the known
-          # failure mode; writing via `printf '%s'` and reading from disk
-          # avoids the entire class. This is the exact approach that
-          # worked historically before the 2354666 "simplify".
+          # The key comes from the secret as a literal string in the
+          # step's env. Write it to a temp file (LF-terminated via
+          # `printf '%s'`) and pass it via --private-key-path. This
+          # matches the historical approach from c14df70 and avoids
+          # the inline-env-string / clap conflict that 2354666 and
+          # 7bda11c both hit.
           KEY_FILE="$(mktemp -t tauri-key.XXXXXX)"
           trap 'rm -f "${KEY_FILE}"' EXIT
           printf '%s' "${TAURI_SIGNING_PRIVATE_KEY}" > "${KEY_FILE}"

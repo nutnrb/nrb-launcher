@@ -46,7 +46,7 @@ Use the **Simulate login (dev)** pill in the bottom-right corner of the window t
 
 ### Test latest build (CI artifact)
 
-Every push to `main` / `dev` / `feat/*` triggers [`.github/workflows/dev-build.yml`](.github/workflows/dev-build.yml). The latest Windows installer is uploaded as a downloadable artifact:
+Every push to `main` / `dev` / `feat/*` triggers [`.github/workflows/upload.yml`](.github/workflows/upload.yml). The latest Windows installer is uploaded as a downloadable artifact:
 
 → <https://github.com/nutnrb/nrb-launcher/actions> → select **"Dev Build"** → scroll to **Artifacts** → download `nrb-launcher-dev.zip`
 

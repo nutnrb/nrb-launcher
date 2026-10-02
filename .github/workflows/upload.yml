@@ -82,7 +82,7 @@ jobs:
           echo "EXE=${EXE}"
           echo "exe=${EXE}" >> "$GITHUB_OUTPUT"
           VERSION="${{ steps.version.outputs.version }}"
-          echo "installer_name=NRB.Launcher_${VERSION}_x64-setup.exe" >> "$GITHUB_OUTPUT"
+          echo "installer_name=NRB Launcher_${VERSION}_x64-setup.exe" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS CLI for R2
         uses: aws-actions/configure-aws-credentials@v4
@@ -123,7 +123,7 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -e
-          EXE_NAME="NRB.Launcher_${VERSION}_x64-setup.exe"
+          EXE_NAME="NRB Launcher_${VERSION}_x64-setup.exe"
           PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           
           # Get signature
@@ -166,7 +166,7 @@ jobs:
           R2_DOMAIN: "${{ env.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
         run: |
           echo "=== R2 URLs ==="
-          echo "Installer: https://${R2_DOMAIN}/${R2_BUCKET}/nrb-launcher/NRB.Launcher_${{ env.VERSION }}_x64-setup.exe"
+          echo "Installer: https://${R2_DOMAIN}/${R2_BUCKET}/nrb-launcher/NRB Launcher_${{ env.VERSION }}_x64-setup.exe"
           echo "latest.json: https://${R2_DOMAIN}/${R2_BUCKET}/nrb-launcher/latest.json"
           echo ""
           echo "=== GitHub Release ==="

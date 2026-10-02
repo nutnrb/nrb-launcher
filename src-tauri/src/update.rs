@@ -161,7 +161,19 @@ pub async fn download_and_install_update<R: Runtime>(
 
             // Return Ok first, then restart (so the response reaches frontend).
             // Note: restart() exits the app, so any code after won't run on most platforms.
+            // Tauri's `app.restart()` reliably relaunches on Windows (which is our only
+            // supported release target). On macOS/Linux it can be unreliable, so we
+            // gate it on Windows; the frontend is expected to prompt the user to
+            // relaunch manually on non-Windows platforms.
+            #[cfg(windows)]
             app.restart();
+
+            #[cfg(not(windows))]
+            {
+                // No-op on non-Windows: user will relaunch manually.
+            }
+
+            Ok(new_version)
         }
         Err(e) => {
             let err_msg = format!("Install failed: {e}");

@@ -1,6 +1,6 @@
 [package]
 name = "nrb-launcher"
-version = "0.4.2"
+version = "0.5.0"
 description = "NRB Launcher — desktop app"
 authors = ["NRB Team"]
 license = "MIT"
@@ -35,8 +35,9 @@ keyring = "3"
 dirs = "5"
 futures-util = "0.3"
 hostname = "0.3"
-tokio = { version = "1", features = ["fs", "rt", "sync"] }
+tokio = { version = "1", features = ["fs", "rt", "sync", "process", "io-util"] }
 futures = "0.3"
+nvml-wrapper = { version = "0.13", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
@@ -44,3 +45,9 @@ winreg = "0.52"
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+
+# CutAI v3 — Phase 0 "Hello GPU".
+# Pulls in nvml-wrapper for direct NVIDIA Management Library queries (cascade
+# tier 1 in agent/gpu.rs). Off by default so the default build stays
+# identical to the v0.4.x line. Enable with `--features cutai`.
+cutai = ["dep:nvml-wrapper"]

@@ -85,13 +85,13 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           echo "installer_name=NRB Launcher_${VERSION}_x64-setup.exe" >> "$GITHUB_OUTPUT"
 
-      - name: Configure AWS CLI for R2
+      - name: Configure AWS Credentials (R2)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          aws-region: auto
-          # R2 uses auto region
+          aws-region: us-east-1  # MUST be pinned explicitly; R2 has no STS endpoint so "auto" fails to resolve sts.amazonaws.com
+          # R2 is S3-compatible and ignores region for data plane, but STS still needs a valid region
 
       - name: Upload installer to R2
         env:
@@ -106,12 +106,14 @@ jobs:
           
           # Upload installer
           aws s3 cp "$EXE_PATH" "s3://${{ env.R2_BUCKET }}/nrb-launcher/$EXE_NAME" \
-            --endpoint-url "https://${{ env.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+            --endpoint-url "https://${{ env.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com" \
+            --region us-east-1
           
           # Upload signature if exists
           if [ -f "$SIG_PATH" ]; then
             aws s3 cp "$SIG_PATH" "s3://${{ env.R2_BUCKET }}/nrb-launcher/${EXE_NAME}.sig" \
-              --endpoint-url "https://${{ env.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+              --endpoint-url "https://${{ env.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com" \
+              --region us-east-1
           fi
           
           echo "Done uploading installer"
@@ -156,6 +158,7 @@ jobs:
           # Upload latest.json to bucket (S3 API still uses the account-id subdomain endpoint, not the custom domain)
           aws s3 cp latest.json "s3://${R2_BUCKET}/nrb-launcher/latest.json" \
             --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+            --region us-east-1 \
             --cache-control "no-cache"
           
           echo "latest.json uploaded"

@@ -170,10 +170,45 @@ jobs:
             exit 1
           fi
 
+          # Wrap the sign call so that any stderr from tauri-cli is
+          # captured even if `set -e` would otherwise short-circuit. The
+          # last 30 lines are echoed so that "Wrong password" / "no
+          # such file" / clap-parse errors surface in the step log
+          # output (annotations only show one line; full logs require
+          # repo admin, so we self-emit the relevant slice here).
+          SIGN_LOG="$(mktemp -t tauri-sign.XXXXXX.log)"
+          set +e
           pnpm tauri signer sign \
             --private-key-path "${KEY_FILE}" \
             --app-version "${{ steps.version.outputs.version }}" \
-            "${EXE_PATH}"
+            "${EXE_PATH}" \
+            >"${SIGN_LOG}.stdout" 2>"${SIGN_LOG}.stderr"
+          SIGN_EXIT=$?
+          set -e
+          echo "sign exit code: ${SIGN_EXIT}"
+          echo "--- last 30 lines of sign stdout ---"
+          tail -n 30 "${SIGN_LOG}.stdout" || true
+          echo "--- last 30 lines of sign stderr ---"
+          tail -n 30 "${SIGN_LOG}.stderr" || true
+          if [ "${SIGN_EXIT}" -ne 0 ]; then
+            # Map common failures to a ::error:: annotation. The
+            # annotations page only renders the LAST ::error:: per step,
+            # so emit the most specific one we can identify.
+            if grep -q "Wrong password" "${SIGN_LOG}.stderr" 2>/dev/null; then
+              echo "::error::Secret TAURI_SIGNING_PRIVATE_KEY_PASSWORD does not match TAURI_SIGNING_PRIVATE_KEY. The new key was rotated and a fresh password was generated; confirm the repo secret was updated (not the previous password)."
+            elif grep -q "No such device" "${SIGN_LOG}.stderr" 2>/dev/null; then
+              echo "::error::Secret TAURI_SIGNING_PRIVATE_KEY_PASSWORD is missing or empty."
+            elif grep -q "No NSIS installer" "${SIGN_LOG}.stderr" 2>/dev/null; then
+              echo "::error::No NSIS installer found."
+            elif grep -q "private-key" "${SIGN_LOG}.stderr" 2>/dev/null; then
+              echo "::error::tauri-cli rejected the key path: $(cat ${SIGN_LOG}.stderr)"
+            else
+              echo "::error::tauri signer sign failed (exit ${SIGN_EXIT}). See full output above."
+            fi
+            rm -f "${SIGN_LOG}.stdout" "${SIGN_LOG}.stderr" "${SIGN_LOG}"
+            exit 1
+          fi
+          rm -f "${SIGN_LOG}.stdout" "${SIGN_LOG}.stderr" "${SIGN_LOG}"
 
           if [ ! -f "${EXE_PATH}.sig" ]; then
             echo "::error::signer sign ran but ${EXE_PATH}.sig was not produced"

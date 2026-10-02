@@ -14,7 +14,7 @@ import { UpdateBanner } from "./components/UpdateBanner";
 import { clearAuth, loadAuth, onHubMessage, saveAuth, type AuthUser } from "./lib/auth";
 import { useTheme } from "./hooks/useTheme";
 
-const LAUNCHER_VERSION = "0.5.0";
+const LAUNCHER_VERSION = "0.5.1";
 
 const queryClient = new QueryClient({
   defaultOptions: {

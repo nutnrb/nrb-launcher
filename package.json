@@ -1,6 +1,6 @@
 {
   "name": "nrb-launcher",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "NRB Launcher \u2014 desktop app to manage NRB programs",
   "scripts": {

@@ -4,10 +4,13 @@
 import { Minus, Moon, Sun, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useTheme } from "../hooks/useTheme";
+import { CutaiStatusBadge } from "./CutaiStatusBadge";
 
 export interface TitleBarProps {
   version: string;
   online: boolean;
+  /** Whether the user is logged in (controls CutAI badge polling). */
+  loggedIn?: boolean;
 }
 
 const appWindow = getCurrentWindow();
@@ -27,7 +30,7 @@ async function close() {
   }
 }
 
-export function TitleBar({ version, online }: TitleBarProps) {
+export function TitleBar({ version, online, loggedIn = false }: TitleBarProps) {
   const [theme, , toggle] = useTheme();
 
   return (
@@ -58,6 +61,7 @@ export function TitleBar({ version, online }: TitleBarProps) {
           />
           {online ? "ออนไลน์" : "ออฟไลน์"}
         </span>
+        <CutaiStatusBadge enabled={loggedIn} />
         <button
           type="button"
           className="titlebar-btn"

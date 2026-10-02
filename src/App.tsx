@@ -111,7 +111,7 @@ function Shell() {
 
   return (
     <div className="app-shell">
-      <TitleBar version={LAUNCHER_VERSION} online={online} />
+      <TitleBar version={LAUNCHER_VERSION} online={online} loggedIn={user !== null} />
 
       <main className="app-shell-main">
         <div className="app-shell-inner">

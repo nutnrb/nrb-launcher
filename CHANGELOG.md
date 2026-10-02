@@ -5,6 +5,22 @@ All notable changes to NRB Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-10-02
+
+### Security
+
+- **Rotated Tauri updater signing key.** The previous minisign private key
+  had no recoverable passphrase on this dev host (no backup), so a fresh
+  keypair was generated and committed via `pnpm tauri signer generate`.
+  The new public key (`AC88C130D84E558B`) is now embedded in
+  `src-tauri/tauri.conf.json` → `plugins.updater.pubkey`. **All existing
+  installs of v0.4.x and earlier v0.5.0-preview builds will fail the
+  updater signature check on next launch and refuse the v0.5.0 update**
+  (the bundled public key no longer corresponds to the old signing key).
+  Users can keep using their installed build; only the auto-update path
+  is affected. CI also gained a dedicated local sign step so the R2
+  `*.sig` and `latest.json.signature` are produced correctly.
+
 ## [0.5.0-preview-cutai-phase0] - 2026-10-02
 
 ### CutAI v3 — Phase 0 "Hello GPU". Verification only — no jobs yet.

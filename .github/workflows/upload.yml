@@ -94,6 +94,53 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           echo "installer_name=NRB Launcher_${VERSION}_x64-setup.exe" >> "$GITHUB_OUTPUT"
 
+      # Sign the NSIS installer locally for the R2 upload.
+      #
+      # Why we sign here even though tauri-action already produces a signed
+      # GitHub-Release asset: tauri-action uploads its own signature only into
+      # the GitHub Release manifest (latest.json). It does NOT write
+      # `${EXE_PATH}.sig` next to the local NSIS bundle, so the R2 upload
+      # step below would silently skip the .sig file. Re-running the Tauri
+      # signer here guarantees `${EXE_PATH}.sig` exists on disk.
+      #
+      # The signing key is supplied as a GitHub Actions secret
+      # (TAURI_SIGNING_PRIVATE_KEY) and its password as
+      # TAURI_SIGNING_PRIVATE_KEY_PASSWORD — both already used by tauri-action
+      # above, see docs/CODE_SIGNING.md.
+      - name: Sign installer for R2 upload
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          EXE_PATH=$(ls src-tauri/target/release/bundle/nsis/*.exe | head -1)
+          if [ -z "${EXE_PATH}" ]; then
+            echo "::error::No NSIS installer found under src-tauri/target/release/bundle/nsis/"
+            exit 1
+          fi
+          echo "Signing: ${EXE_PATH}"
+
+          # Write the private key to a temp file rather than passing it via
+          # -k/--private-key or env. This matches the historical CI fix
+          # ('fix(workflow): use -f/--private-key-path for signer sign (key
+          # file), not -k (raw string)') and avoids the older clap auto-conflict
+          # between TAURI_SIGNING_PRIVATE_KEY env and -k flag.
+          KEY_FILE="$(mktemp -t tauri-key.XXXXXX)"
+          trap 'rm -f "${KEY_FILE}"' EXIT
+          printf '%s' "${TAURI_SIGNING_PRIVATE_KEY}" > "${KEY_FILE}"
+
+          pnpm tauri signer sign \
+            --private-key-path "${KEY_FILE}" \
+            --app-version "${{ steps.version.outputs.version }}" \
+            "${EXE_PATH}"
+
+          if [ ! -f "${EXE_PATH}.sig" ]; then
+            echo "::error::signer sign ran but ${EXE_PATH}.sig was not produced"
+            exit 1
+          fi
+          ls -la "${EXE_PATH}.sig"
+
       - name: Upload installer to R2
         shell: bash
         env:
@@ -130,30 +177,40 @@ jobs:
           EXE_NAME="NRB Launcher_${VERSION}_x64-setup.exe"
           PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-          # Get signature
+          # Get signature file (minisign .sig is multi-line; jq will
+          # JSON-escape newlines properly when building latest.json below).
           EXE_PATH=$(ls src-tauri/target/release/bundle/nsis/*.exe | head -1)
           SIG_PATH="${EXE_PATH}.sig"
-          SIGNATURE=""
-          if [ -f "$SIG_PATH" ]; then
-            SIGNATURE=$(cat "$SIG_PATH")
+          if [ ! -f "${SIG_PATH}" ]; then
+            echo "::error::Expected signature file ${SIG_PATH} not found. The Sign installer step must run first."
+            exit 1
           fi
 
           # Use custom domain for the public download URL so end users get a friendly releases.nutnrb.com link
           R2_DOMAIN="releases.nutnrb.com"
 
-          cat > latest.json <<JSON
-          {
-            "version": "${VERSION}",
-            "notes": "Auto-generated release for ${VERSION}",
-            "pub_date": "${PUB_DATE}",
-            "platforms": {
-              "windows-x86_64": {
-                "signature": "${SIGNATURE}",
-                "url": "https://${R2_DOMAIN}/nrb-launcher/${EXE_NAME}"
+          # Build latest.json via jq so the multi-line minisign signature
+          # is JSON-escaped correctly. Heredoc interpolation with a
+          # newline-containing $SIGNATURE would yield invalid JSON.
+          SIGNATURE_FILE="${SIG_PATH}"
+
+          jq -n \
+            --arg version "${VERSION}" \
+            --arg notes "Auto-generated release for ${VERSION}" \
+            --arg pub_date "${PUB_DATE}" \
+            --arg url "https://${R2_DOMAIN}/nrb-launcher/${EXE_NAME}" \
+            --rawfile signature "${SIGNATURE_FILE}" \
+            '{
+              version: $version,
+              notes: $notes,
+              pub_date: $pub_date,
+              platforms: {
+                "windows-x86_64": {
+                  signature: $signature,
+                  url: $url
+                }
               }
-            }
-          }
-          JSON
+            }' > latest.json
           cat latest.json
 
           # Upload latest.json to bucket (S3 API picks up AWS_ENDPOINT_URL_S3 / AWS_REGION

@@ -110,6 +110,9 @@ jobs:
       - name: Sign installer for R2 upload
         shell: bash
         env:
+          # tauri-cli >= 2.x automatically reads TAURI_SIGNING_PRIVATE_KEY and
+          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD from env. See
+          # https://v2.tauri.app/reference/cli/#signer-sign.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
@@ -130,17 +133,7 @@ jobs:
             exit 1
           fi
 
-          # Write the private key to a temp file rather than passing it via
-          # -k/--private-key or env. This matches the historical CI fix
-          # ('fix(workflow): use -f/--private-key-path for signer sign (key
-          # file), not -k (raw string)') and avoids the older clap auto-conflict
-          # between TAURI_SIGNING_PRIVATE_KEY env and -k flag.
-          KEY_FILE="$(mktemp -t tauri-key.XXXXXX)"
-          trap 'rm -f "${KEY_FILE}"' EXIT
-          printf '%s' "${TAURI_SIGNING_PRIVATE_KEY}" > "${KEY_FILE}"
-
           pnpm tauri signer sign \
-            --private-key-path "${KEY_FILE}" \
             --app-version "${{ steps.version.outputs.version }}" \
             "${EXE_PATH}"
 

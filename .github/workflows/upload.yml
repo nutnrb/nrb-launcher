@@ -90,8 +90,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1  # MUST be pinned explicitly; R2 has no STS endpoint so "auto" fails to resolve sts.amazonaws.com
-          # R2 is S3-compatible and ignores region for data plane, but STS still needs a valid region
+          aws-region: us-east-1
 
       - name: Upload installer to R2
         env:

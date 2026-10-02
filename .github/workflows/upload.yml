@@ -121,6 +121,15 @@ jobs:
           fi
           echo "Signing: ${EXE_PATH}"
 
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "::error::Secret TAURI_SIGNING_PRIVATE_KEY is missing in this repo. Add it under Settings → Secrets and variables → Actions. See docs/CODE_SIGNING.md for the expected format."
+            exit 1
+          fi
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
+            echo "::error::Secret TAURI_SIGNING_PRIVATE_KEY_PASSWORD is missing in this repo. Add it under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
           # Write the private key to a temp file rather than passing it via
           # -k/--private-key or env. This matches the historical CI fix
           # ('fix(workflow): use -f/--private-key-path for signer sign (key

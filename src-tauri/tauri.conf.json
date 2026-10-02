@@ -66,7 +66,7 @@
       "active": true,
       "dialog": true,
       "endpoints": [
-        "https://pub-xxx.r2.dev/nrb-launcher/latest.json",
+        "https://releases.nutnrb.com/nrb-launcher/latest.json",
         "https://github.com/nutnrb/nrb-launcher/releases/download/preview-latest/latest.json",
         "https://github.com/nutnrb/nrb-launcher/releases/latest/download/latest.json",
         "https://github.com/nutnrb/nrb-launcher/releases/download/v{{version}}/latest.json"

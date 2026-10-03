@@ -126,7 +126,8 @@ jobs:
         shell: bash
         run: |
           # Replace the FIRST occurrence of `version = "..."` (the one under
-          # [package]). cargo update -p nrb-launcher below will refresh Cargo.lock.
+          # [package]). The next step rewrites the matching entry in
+          # Cargo.lock so cargo build doesn't fail on a version mismatch.
           sed -i '0,/^version = ".*"/s//version = "${{ steps.ver.outputs.version }}"/' src-tauri/Cargo.toml
 
       - name: Refresh Cargo.lock for the new package version

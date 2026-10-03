@@ -156,8 +156,27 @@ jobs:
       - name: Build Tauri installer (NSIS only)
         # We do NOT use tauri-action here: tauri-action wants a tag and would
         # publish a GitHub Release, both of which we don't want for previews.
+        # Output is captured to a log file and tailed so ::error:: annotations
+        # show the underlying cargo/tauri message instead of just "Process exited 1".
         shell: bash
-        run: pnpm tauri build --bundles nsis
+        run: |
+          set -uo pipefail
+          TAURI_LOG="$(mktemp -t tauri-build.XXXXXX.log)"
+          set +e
+          pnpm tauri build --bundles nsis \
+            >"${TAURI_LOG}.stdout" 2>"${TAURI_LOG}.stderr"
+          EXIT_CODE=$?
+          set -e
+          echo "tauri build exit: ${EXIT_CODE}"
+          echo "--- last 80 lines of stdout ---"
+          tail -n 80 "${TAURI_LOG}.stdout" || true
+          echo "--- last 80 lines of stderr ---"
+          tail -n 80 "${TAURI_LOG}.stderr" || true
+          if [ "${EXIT_CODE}" -ne 0 ]; then
+            echo "::error::pnpm tauri build failed (exit ${EXIT_CODE}). See log above."
+            exit "${EXIT_CODE}"
+          fi
+          rm -f "${TAURI_LOG}.stdout" "${TAURI_LOG}.stderr"
 
       - name: Find NSIS installer
         id: find

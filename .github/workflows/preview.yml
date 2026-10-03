@@ -70,17 +70,30 @@ jobs:
         id: ver
         shell: bash
         run: |
-          # Derive a version like 0.5.1-preview.<short-sha>-<sanitized-branch>.
+          # Derive a version like 0.5.1-preview-abc1234-test-preview-workflow.
           # - BASE_VERSION comes from package.json (the current "next" version).
-          # - SHORT_SHA is 7 chars of HEAD.
+          # - SHORT_SHA is 7 chars of HEAD (or "local" if empty, e.g. on a
+          #   re-run without a fresh commit).
           # - BRANCH is sanitized for path use: [A-Za-z0-9-], lowercase,
           #   max 40 chars. Anything else (slashes, underscores, dots,
           #   emoji, etc.) becomes a hyphen.
+          #
+          # CRITICAL: Tauri's semver parser requires non-empty pre-release
+          # identifier segments (no consecutive dots, no leading/trailing
+          # dots in pre-release). We therefore use a SINGLE HYPHEN separator
+          # between pre-release fields rather than dots. The result is
+          # always a semver-valid string like
+          #   0.5.1-preview-abc1234-test-preview-workflow
           set -euo pipefail
           BASE_VERSION=$(grep -m1 '"version"' package.json | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
-          SHORT_SHA=$(echo "${{ github.head_sha }}" | cut -c1-7)
+          HEAD_SHA_VALUE="${{ github.head_sha }}"
+          if [ -z "${HEAD_SHA_VALUE}" ]; then HEAD_SHA_VALUE="local"; fi
+          SHORT_SHA=$(echo "${HEAD_SHA_VALUE}" | cut -c1-7)
           BRANCH=$(echo "${{ github.ref_name }}" | tr '/_. ' '----' | tr '[:upper:]' '[:lower:]' | cut -c1-40)
-          PREVIEW_VERSION="${BASE_VERSION}-preview.${SHORT_SHA}.${BRANCH}"
+          # Hyphen separator: keeps each segment a valid semver pre-release
+          # identifier AND keeps the version single-string-safe for both
+          # Tauri (strict semver) and Cargo (lenient semver).
+          PREVIEW_VERSION="${BASE_VERSION}-preview-${SHORT_SHA}-${BRANCH}"
           echo "version=${PREVIEW_VERSION}" >> "$GITHUB_OUTPUT"
           echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
           echo "sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
@@ -156,27 +169,8 @@ jobs:
       - name: Build Tauri installer (NSIS only)
         # We do NOT use tauri-action here: tauri-action wants a tag and would
         # publish a GitHub Release, both of which we don't want for previews.
-        # Output is captured to a log file and tailed so ::error:: annotations
-        # show the underlying cargo/tauri message instead of just "Process exited 1".
         shell: bash
-        run: |
-          set -uo pipefail
-          TAURI_LOG="$(mktemp -t tauri-build.XXXXXX.log)"
-          set +e
-          pnpm tauri build --bundles nsis \
-            >"${TAURI_LOG}.stdout" 2>"${TAURI_LOG}.stderr"
-          EXIT_CODE=$?
-          set -e
-          echo "tauri build exit: ${EXIT_CODE}"
-          echo "--- last 80 lines of stdout ---"
-          tail -n 80 "${TAURI_LOG}.stdout" || true
-          echo "--- last 80 lines of stderr ---"
-          tail -n 80 "${TAURI_LOG}.stderr" || true
-          if [ "${EXIT_CODE}" -ne 0 ]; then
-            echo "::error::pnpm tauri build failed (exit ${EXIT_CODE}). See log above."
-            exit "${EXIT_CODE}"
-          fi
-          rm -f "${TAURI_LOG}.stdout" "${TAURI_LOG}.stderr"
+        run: pnpm tauri build --bundles nsis
 
       - name: Find NSIS installer
         id: find

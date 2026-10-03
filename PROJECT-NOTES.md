@@ -185,4 +185,4 @@ If you are an AI agent picking this up: skim the doc, then run `git log --onelin
 
 ---
 
-Last verified: 2026-10-03
+Last verified: 2026-10-03<!-- preview handoff 2026-10-03T06:12:13Z -->

@@ -119,9 +119,10 @@ jobs:
       - name: Refresh Cargo.lock for the new package version
         # Without this, `cargo build` would fail because Cargo.toml's [package]
         # version (e.g. 0.5.1-preview.abc1234.branch) no longer matches the
-        # version pinned for nrb-launcher in Cargo.lock.
+        # version pinned for nrb-launcher in Cargo.lock. `--offline` prevents
+        # cargo from contacting crates.io.
         shell: bash
-        run: cargo update -p nrb-launcher --manifest-path src-tauri/Cargo.toml
+        run: cargo update -p nrb-launcher --offline --manifest-path src-tauri/Cargo.toml
 
       - name: Build frontend
         run: pnpm build

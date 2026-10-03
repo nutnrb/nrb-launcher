@@ -116,6 +116,13 @@ jobs:
           # [package]). cargo update -p nrb-launcher below will refresh Cargo.lock.
           sed -i '0,/^version = ".*"/s//version = "${{ steps.ver.outputs.version }}"/' src-tauri/Cargo.toml
 
+      - name: Refresh Cargo.lock for the new package version
+        # Without this, `cargo build` would fail because Cargo.toml's [package]
+        # version (e.g. 0.5.1-preview.abc1234.branch) no longer matches the
+        # version pinned for nrb-launcher in Cargo.lock.
+        shell: bash
+        run: cargo update -p nrb-launcher --manifest-path src-tauri/Cargo.toml
+
       - name: Build frontend
         run: pnpm build
 

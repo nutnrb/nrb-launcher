@@ -123,13 +123,44 @@ jobs:
         # version explicitly to cargo update --precise so cargo doesn't have
         # to look anything up in the registry. We cd into src-tauri so cargo
         # picks up the right Cargo.toml without us having to worry about
-        # path-translation issues on windows-latest's Git Bash.
+        # path-translation issues on windows-latest's Git Bash. Output is
+        # captured to a log file and tailed so ::error:: annotations show
+        # the underlying cargo message instead of just "Process exited 101".
         shell: bash
         env:
           NEW_VERSION: ${{ steps.ver.outputs.version }}
         run: |
+          set -uo pipefail
+          echo "cargo --version:"
+          cargo --version
+          echo "rustc --version:"
+          rustc --version
+          echo "pwd: $(pwd)"
+          echo "ls -la src-tauri/:"
+          ls -la src-tauri/ | head -10
+          echo "src-tauri/Cargo.toml version line:"
+          grep '^version = ' src-tauri/Cargo.toml | head -2
+          echo "src-tauri/Cargo.lock head:"
+          head -5 src-tauri/Cargo.lock
+          echo "---"
+
           cd src-tauri
-          cargo update -p nrb-launcher --precise "${NEW_VERSION}" --offline
+          CARGO_LOG="$(mktemp -t cargo-update.XXXXXX.log)"
+          set +e
+          cargo update -p nrb-launcher --precise "${NEW_VERSION}" --offline \
+            >"${CARGO_LOG}.stdout" 2>"${CARGO_LOG}.stderr"
+          EXIT_CODE=$?
+          set -e
+          echo "cargo update exit: ${EXIT_CODE}"
+          echo "--- cargo stdout ---"
+          cat "${CARGO_LOG}.stdout"
+          echo "--- cargo stderr ---"
+          cat "${CARGO_LOG}.stderr"
+          if [ "${EXIT_CODE}" -ne 0 ]; then
+            echo "::error::cargo update failed (exit ${EXIT_CODE}). See log above."
+            exit "${EXIT_CODE}"
+          fi
+          rm -f "${CARGO_LOG}.stdout" "${CARGO_LOG}.stderr"
 
       - name: Build frontend
         run: pnpm build

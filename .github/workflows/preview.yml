@@ -117,15 +117,19 @@ jobs:
           sed -i '0,/^version = ".*"/s//version = "${{ steps.ver.outputs.version }}"/' src-tauri/Cargo.toml
 
       - name: Refresh Cargo.lock for the new package version
-        # Without this, `cargo build` would fail because Cargo.toml's [package]
+        # Without this, `cargo build` fails because Cargo.toml's [package]
         # version (e.g. 0.5.1-preview.abc1234.branch) no longer matches the
-        # version pinned for nrb-launcher in Cargo.lock. We `cd` into src-tauri
-        # first so cargo picks up the right Cargo.toml without us having to
-        # worry about path-translation issues on windows-latest's Git Bash.
+        # version pinned for nrb-launcher in Cargo.lock. We pass the new
+        # version explicitly to cargo update --precise so cargo doesn't have
+        # to look anything up in the registry. We cd into src-tauri so cargo
+        # picks up the right Cargo.toml without us having to worry about
+        # path-translation issues on windows-latest's Git Bash.
         shell: bash
+        env:
+          NEW_VERSION: ${{ steps.ver.outputs.version }}
         run: |
           cd src-tauri
-          cargo update -p nrb-launcher --offline
+          cargo update -p nrb-launcher --precise "${NEW_VERSION}" --offline
 
       - name: Build frontend
         run: pnpm build

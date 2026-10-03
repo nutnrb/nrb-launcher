@@ -119,48 +119,36 @@ jobs:
       - name: Refresh Cargo.lock for the new package version
         # Without this, `cargo build` fails because Cargo.toml's [package]
         # version (e.g. 0.5.1-preview.abc1234.branch) no longer matches the
-        # version pinned for nrb-launcher in Cargo.lock. We pass the new
-        # version explicitly to cargo update --precise so cargo doesn't have
-        # to look anything up in the registry. We cd into src-tauri so cargo
-        # picks up the right Cargo.toml without us having to worry about
-        # path-translation issues on windows-latest's Git Bash. Output is
-        # captured to a log file and tailed so ::error:: annotations show
-        # the underlying cargo message instead of just "Process exited 101".
+        # version pinned for nrb-launcher in Cargo.lock. We sidestep the
+        # `cargo update` call entirely and rewrite the lockfile directly:
+        # the nrb-launcher block in Cargo.lock has a stable shape (no other
+        # packages reference that name), and rewriting `version = "0.5.1"`
+        # to `version = "<new>"` keeps the lockfile self-consistent. This
+        # avoids any toolchain / offline-mode / path quirks with `cargo update`
+        # that we couldn't get away from on windows-latest's Git Bash.
         shell: bash
         env:
           NEW_VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -uo pipefail
-          echo "cargo --version:"
-          cargo --version
-          echo "rustc --version:"
-          rustc --version
-          echo "pwd: $(pwd)"
-          echo "ls -la src-tauri/:"
-          ls -la src-tauri/ | head -10
-          echo "src-tauri/Cargo.toml version line:"
-          grep '^version = ' src-tauri/Cargo.toml | head -2
-          echo "src-tauri/Cargo.lock head:"
-          head -5 src-tauri/Cargo.lock
-          echo "---"
+          echo "Before:"
+          grep -A1 'name = "nrb-launcher"' src-tauri/Cargo.lock | head -3
 
-          cd src-tauri
-          CARGO_LOG="$(mktemp -t cargo-update.XXXXXX.log)"
-          set +e
-          cargo update -p nrb-launcher --precise "${NEW_VERSION}" --offline \
-            >"${CARGO_LOG}.stdout" 2>"${CARGO_LOG}.stderr"
-          EXIT_CODE=$?
-          set -e
-          echo "cargo update exit: ${EXIT_CODE}"
-          echo "--- cargo stdout ---"
-          cat "${CARGO_LOG}.stdout"
-          echo "--- cargo stderr ---"
-          cat "${CARGO_LOG}.stderr"
-          if [ "${EXIT_CODE}" -ne 0 ]; then
-            echo "::error::cargo update failed (exit ${EXIT_CODE}). See log above."
-            exit "${EXIT_CODE}"
-          fi
-          rm -f "${CARGO_LOG}.stdout" "${CARGO_LOG}.stderr"
+          # Rewrite the version line for the nrb-launcher [[package]] block.
+          # Use awk so we only touch the nrb-launcher block, not any other
+          # package whose name happens to contain "nrb-launcher".
+          awk -v ver="${NEW_VERSION}" '
+            /^name = "nrb-launcher"$/ { in_block=1 }
+            in_block && /^version = "/ {
+              sub(/^version = ".*"$/, "version = \"" ver "\"")
+              in_block=0
+            }
+            { print }
+          ' src-tauri/Cargo.lock > src-tauri/Cargo.lock.new
+          mv src-tauri/Cargo.lock.new src-tauri/Cargo.lock
+
+          echo "After:"
+          grep -A1 'name = "nrb-launcher"' src-tauri/Cargo.lock | head -3
 
       - name: Build frontend
         run: pnpm build

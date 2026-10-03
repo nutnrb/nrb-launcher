@@ -119,10 +119,13 @@ jobs:
       - name: Refresh Cargo.lock for the new package version
         # Without this, `cargo build` would fail because Cargo.toml's [package]
         # version (e.g. 0.5.1-preview.abc1234.branch) no longer matches the
-        # version pinned for nrb-launcher in Cargo.lock. `--offline` prevents
-        # cargo from contacting crates.io.
+        # version pinned for nrb-launcher in Cargo.lock. We `cd` into src-tauri
+        # first so cargo picks up the right Cargo.toml without us having to
+        # worry about path-translation issues on windows-latest's Git Bash.
         shell: bash
-        run: cargo update -p nrb-launcher --offline --manifest-path src-tauri/Cargo.toml
+        run: |
+          cd src-tauri
+          cargo update -p nrb-launcher --offline
 
       - name: Build frontend
         run: pnpm build
